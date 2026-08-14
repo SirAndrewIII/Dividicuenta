@@ -178,7 +178,6 @@ export default function DividiCuentaApp() {
         method: "POST",
         body: formData,
       });
-      // Corregido: se usa 'response' de manera consistente
       const datos = await response.json(); 
       
       if (datos.status === "success") {
@@ -318,7 +317,7 @@ export default function DividiCuentaApp() {
           )}
         </div>
 
-        {/* Sección de Escaneo de Carta con IA (Imágenes y PDFs) */}
+        {/* Sección de Escaneo de Carta con IA */}
         <div className="p-6 border-b border-gray-100 bg-emerald-50/50">
           <h2 className="text-lg font-semibold text-emerald-800 mb-2">Escanear Menú con IA</h2>
           <p className="text-sm text-gray-600 mb-4">Sube una foto o un archivo PDF de la carta del restaurante para extraer los platos por categorías automáticamente.</p>
@@ -331,7 +330,6 @@ export default function DividiCuentaApp() {
             {cargandoMenu && <span className="text-sm text-emerald-700 font-medium animate-pulse">Analizando carta con IA...</span>}
           </div>
 
-          {/* Menú Detectado por Categorías */}
           {menuRestaurante && menuRestaurante.categorias && (
             <div id="seccion-menu-ia" className="mt-6 bg-white p-4 rounded-xl border border-emerald-200 shadow-sm space-y-6">
               <h3 className="font-bold text-emerald-900">Menú Organizado (Haz clic en un plato para agregarlo):</h3>
@@ -400,35 +398,37 @@ export default function DividiCuentaApp() {
                   </button>
                 </div>
 
-                {/* Ítems del comensal */}
+                {/* Ítems del comensal corregidos con min-w-0 y shrink-0 */}
                 <div className="space-y-2">
                   {comensal.items.map(item => (
-                    <div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded-lg gap-2">
+                    <div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded-lg gap-1 sm:gap-2">
                       <input 
                         type="text" 
                         value={item.nombre}
                         onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'nombre', e.target.value)}
-                        className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-emerald-500 focus:outline-none flex-1 text-gray-700"
+                        className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-emerald-500 focus:outline-none flex-1 min-w-0 text-gray-700"
                       />
-                      <input 
-                        type="number" 
-                        value={item.cantidad}
-                        onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'cantidad', e.target.value)}
-                        className="w-12 text-center bg-white border border-gray-200 rounded px-1"
-                      />
-                      <span className="text-gray-500">x</span>
-                      <input 
-                        type="number" 
-                        value={item.valorUnitario}
-                        onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'valorUnitario', e.target.value)}
-                        className="w-20 text-right bg-white border border-gray-200 rounded px-1"
-                      />
-                      <button 
-                        onClick={() => eliminarItemDeComensal(comensal.id, item.id)}
-                        className="text-red-400 hover:text-red-600 font-bold px-1"
-                      >
-                        ×
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <input 
+                          type="number" 
+                          value={item.cantidad}
+                          onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'cantidad', e.target.value)}
+                          className="w-10 text-center bg-white border border-gray-200 rounded px-1 text-xs"
+                        />
+                        <span className="text-gray-400 text-xs">x</span>
+                        <input 
+                          type="number" 
+                          value={item.valorUnitario}
+                          onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'valorUnitario', e.target.value)}
+                          className="w-16 sm:w-20 text-right bg-white border border-gray-200 rounded px-1 text-xs sm:text-sm"
+                        />
+                        <button 
+                          onClick={() => eliminarItemDeComensal(comensal.id, item.id)}
+                          className="text-red-400 hover:text-red-600 font-bold px-1 text-base"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
                   ))}
                   {comensal.items.length === 0 && (
