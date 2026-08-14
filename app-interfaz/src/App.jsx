@@ -1,32 +1,9 @@
 import React, { useState } from 'react';
 
 export default function DividiCuentaApp() {
-  // --- ESTADOS PRINCIPALES ---
-  const [comensales, setComensales] = useState([
-    {
-      id: 1,
-      nombre: 'Andrés',
-      items: [
-        { id: 101, nombre: 'Hamburguesa', cantidad: 1, valorUnitario: 45000 }
-      ]
-    },
-    {
-      id: 2,
-      nombre: 'Lucía',
-      items: [
-        { id: 102, nombre: 'Pasta', cantidad: 1, valorUnitario: 38000 }
-      ]
-    }
-  ]);
-
-  const [compartidos, setCompartidos] = useState([
-    {
-      id: 201,
-      nombre: 'Entrada de Patacones',
-      valorTotal: 30000,
-      comensalesIds: [1, 2]
-    }
-  ]);
+  // --- ESTADOS PRINCIPALES (INICIALIZADOS VACÍOS) ---
+  const [comensales, setComensales] = useState([]);
+  const [compartidos, setCompartidos] = useState([]);
 
   const [nuevoComensal, setNuevoComensal] = useState('');
   const [propina, setPropina] = useState(10);
@@ -35,7 +12,7 @@ export default function DividiCuentaApp() {
   const [itemNombre, setItemNombre] = useState('');
   const [itemCantidad, setItemCantidad] = useState(1);
   const [itemValor, setItemValor] = useState('');
-  const [comensalSeleccionadoId, setComensalSeleccionadoId] = useState(1);
+  const [comensalSeleccionadoId, setComensalSeleccionadoId] = useState(null);
 
   // Estados temporales para plato compartido
   const [compNombre, setCompNombre] = useState('');
@@ -62,6 +39,8 @@ export default function DividiCuentaApp() {
     setComensales(filtrados);
     if (comensalSeleccionadoId === id && filtrados.length > 0) {
       setComensalSeleccionadoId(filtrados[0].id);
+    } else if (filtrados.length === 0) {
+      setComensalSeleccionadoId(null);
     }
     setCompartidos(compartidos.map(comp => ({
       ...comp,
@@ -75,7 +54,7 @@ export default function DividiCuentaApp() {
 
   // --- FUNCIONES DE ÍTEMS INDIVIDUALES ---
   const agregarItemAComensal = () => {
-    if (!itemNombre.trim() || !itemValor || isNaN(itemValor)) return;
+    if (!itemNombre.trim() || !itemValor || isNaN(itemValor) || !comensalSeleccionadoId) return;
 
     const valorNum = parseFloat(itemValor);
     const cantNum = parseInt(itemCantidad, 10) || 1;
@@ -221,6 +200,7 @@ export default function DividiCuentaApp() {
       setItemNombre('');
       setItemCantidad(1);
       setItemValor('');
+      setComensalSeleccionadoId(null);
       setCompNombre('');
       setCompValor('');
       setCompIdsSeleccionados([]);
@@ -380,64 +360,70 @@ export default function DividiCuentaApp() {
           </div>
 
           {/* Lista de comensales y sus consumos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {comensales.map(comensal => (
-              <div key={comensal.id} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
-                <div className="flex justify-between items-center">
-                  <input 
-                    type="text" 
-                    value={comensal.nombre}
-                    onChange={(e) => modificarNombreComensal(comensal.id, e.target.value)}
-                    className="font-bold text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-emerald-500 focus:outline-none text-base w-3/4"
-                  />
-                  <button 
-                    onClick={() => eliminarComensal(comensal.id)}
-                    className="text-red-500 hover:text-red-700 text-xs font-semibold px-2 py-1"
-                  >
-                    Eliminar
-                  </button>
-                </div>
+          {comensales.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {comensales.map(comensal => (
+                <div key={comensal.id} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
+                  <div className="flex justify-between items-center">
+                    <input 
+                      type="text" 
+                      value={comensal.nombre}
+                      onChange={(e) => modificarNombreComensal(comensal.id, e.target.value)}
+                      className="font-bold text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-emerald-500 focus:outline-none text-base w-3/4"
+                    />
+                    <button 
+                      onClick={() => eliminarComensal(comensal.id)}
+                      className="text-red-500 hover:text-red-700 text-xs font-semibold px-2 py-1"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
 
-                {/* Ítems del comensal corregidos con min-w-0 y shrink-0 */}
-                <div className="space-y-2">
-                  {comensal.items.map(item => (
-                    <div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded-lg gap-1 sm:gap-2">
-                      <input 
-                        type="text" 
-                        value={item.nombre}
-                        onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'nombre', e.target.value)}
-                        className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-emerald-500 focus:outline-none flex-1 min-w-0 text-gray-700"
-                      />
-                      <div className="flex items-center gap-1 shrink-0">
+                  {/* Ítems del comensal */}
+                  <div className="space-y-2">
+                    {comensal.items.map(item => (
+                      <div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded-lg gap-1 sm:gap-2">
                         <input 
-                          type="number" 
-                          value={item.cantidad}
-                          onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'cantidad', e.target.value)}
-                          className="w-10 text-center bg-white border border-gray-200 rounded px-1 text-xs"
+                          type="text" 
+                          value={item.nombre}
+                          onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'nombre', e.target.value)}
+                          className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-emerald-500 focus:outline-none flex-1 min-w-0 text-gray-700"
                         />
-                        <span className="text-gray-400 text-xs">x</span>
-                        <input 
-                          type="number" 
-                          value={item.valorUnitario}
-                          onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'valorUnitario', e.target.value)}
-                          className="w-16 sm:w-20 text-right bg-white border border-gray-200 rounded px-1 text-xs sm:text-sm"
-                        />
-                        <button 
-                          onClick={() => eliminarItemDeComensal(comensal.id, item.id)}
-                          className="text-red-400 hover:text-red-600 font-bold px-1 text-base"
-                        >
-                          ×
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <input 
+                            type="number" 
+                            value={item.cantidad}
+                            onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'cantidad', e.target.value)}
+                            className="w-10 text-center bg-white border border-gray-200 rounded px-1 text-xs"
+                          />
+                          <span className="text-gray-400 text-xs">x</span>
+                          <input 
+                            type="number" 
+                            value={item.valorUnitario}
+                            onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'valorUnitario', e.target.value)}
+                            className="w-16 sm:w-20 text-right bg-white border border-gray-200 rounded px-1 text-xs sm:text-sm"
+                          />
+                          <button 
+                            onClick={() => eliminarItemDeComensal(comensal.id, item.id)}
+                            className="text-red-400 hover:text-red-600 font-bold px-1 text-base"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {comensal.items.length === 0 && (
-                    <p className="text-xs text-gray-400 italic">No hay consumos individuales registrados.</p>
-                  )}
+                    ))}
+                    {comensal.items.length === 0 && (
+                      <p className="text-xs text-gray-400 italic">No hay consumos individuales registrados.</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+              <p className="text-sm text-gray-500">Agrega comensales para comenzar a registrar la cuenta.</p>
+            </div>
+          )}
 
           {/* Formulario para agregar consumo individual */}
           {comensales.length > 0 && (
@@ -445,7 +431,7 @@ export default function DividiCuentaApp() {
               <h3 className="font-semibold text-sm text-gray-700">Agregar Consumo Individual</h3>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                 <select 
-                  value={comensalSeleccionadoId}
+                  value={comensalSeleccionadoId || ''}
                   onChange={(e) => setComensalSeleccionadoId(Number(e.target.value))}
                   className="border border-gray-300 rounded-lg p-2 text-sm bg-white"
                 >
@@ -539,44 +525,46 @@ export default function DividiCuentaApp() {
           </div>
 
           {/* Configuración de Propina y Totales */}
-          <div className="border-t border-gray-200 pt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Porcentaje de Propina (%)</span>
-              <input 
-                type="number"
-                value={propina}
-                onChange={manejarPropinaChange}
-                className="w-20 border border-gray-300 rounded-lg p-1.5 text-center text-sm font-medium"
-              />
-            </div>
-
-            {/* Resumen Final */}
-            <div className="space-y-3 bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
-              <h3 className="font-bold text-emerald-900 text-sm">Resumen por Comensal</h3>
-              {comensalesCalculados.map(c => (
-                <div key={c.id} className="flex justify-between items-center text-sm border-b border-emerald-100/60 pb-2">
-                  <div>
-                    <span className="font-semibold text-gray-800">{c.nombre}</span>
-                    <span className="text-xs text-gray-500 block">Subtotal: ${Math.round(c.subtotal).toLocaleString()} + Propina: ${Math.round(c.propinaValor).toLocaleString()}</span>
-                  </div>
-                  <span className="font-bold text-emerald-700">${Math.round(c.total).toLocaleString()}</span>
-                </div>
-              ))}
-
-              <div className="flex justify-between items-center pt-2 font-bold text-base text-gray-900">
-                <span>Gran Total Factura:</span>
-                <span className="text-emerald-700">${Math.round(granTotal).toLocaleString()}</span>
+          {comensales.length > 0 && (
+            <div className="border-t border-gray-200 pt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Porcentaje de Propina (%)</span>
+                <input 
+                  type="number"
+                  value={propina}
+                  onChange={manejarPropinaChange}
+                  className="w-20 border border-gray-300 rounded-lg p-1.5 text-center text-sm font-medium"
+                />
               </div>
-            </div>
 
-            {/* Botón WhatsApp */}
-            <button 
-              onClick={compartirWhatsApp}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-xl transition shadow-md flex justify-center items-center gap-2 text-sm"
-            >
-              <span>Enviar por WhatsApp</span>
-            </button>
-          </div>
+              {/* Resumen Final */}
+              <div className="space-y-3 bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
+                <h3 className="font-bold text-emerald-900 text-sm">Resumen por Comensal</h3>
+                {comensalesCalculados.map(c => (
+                  <div key={c.id} className="flex justify-between items-center text-sm border-b border-emerald-100/60 pb-2">
+                    <div>
+                      <span className="font-semibold text-gray-800">{c.nombre}</span>
+                      <span className="text-xs text-gray-500 block">Subtotal: ${Math.round(c.subtotal).toLocaleString()} + Propina: ${Math.round(c.propinaValor).toLocaleString()}</span>
+                    </div>
+                    <span className="font-bold text-emerald-700">${Math.round(c.total).toLocaleString()}</span>
+                  </div>
+                ))}
+
+                <div className="flex justify-between items-center pt-2 font-bold text-base text-gray-900">
+                  <span>Gran Total Factura:</span>
+                  <span className="text-emerald-700">${Math.round(granTotal).toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Botón WhatsApp */}
+              <button 
+                onClick={compartirWhatsApp}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-xl transition shadow-md flex justify-center items-center gap-2 text-sm"
+              >
+                <span>Enviar por WhatsApp</span>
+              </button>
+            </div>
+          )}
 
         </div>
       </div>
