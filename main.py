@@ -18,7 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cliente nativo de Gemini (funciona con las claves nuevas "AQ." y con las "AIza" clásicas)
+# Cliente nativo de Gemini
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 PROMPT = """
@@ -59,7 +59,7 @@ async def parse_menu(file: UploadFile = File(...)):
             )
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",  # rápido y económico; usa "gemini-2.5-pro" si necesitas más precisión
+            model="gemini-2.5-flash",
             contents=[
                 types.Part.from_bytes(data=contents, mime_type=mime_type),
                 PROMPT,
@@ -76,3 +76,8 @@ async def parse_menu(file: UploadFile = File(...)):
     except Exception as e:
         print(f"Error al procesar el menú con IA: {e}")
         return {"status": "error", "message": str(e)}
+
+
+@app.get("/")
+async def root():
+    return {"message": "API de DividiCuenta funcionando correctamente"}
