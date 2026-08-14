@@ -178,7 +178,8 @@ export default function DividiCuentaApp() {
         method: "POST",
         body: formData,
       });
-      const datos = await respuesta.json();
+      // Corregido: se usa 'response' de manera consistente
+      const datos = await response.json(); 
       
       if (datos.status === "success") {
         setMenuRestaurante(datos.menu);
