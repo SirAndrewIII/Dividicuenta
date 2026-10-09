@@ -67,3 +67,30 @@ export function saldarDeudas(personas) {
 
 export const formatoPesos = (n) =>
   '$' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+// "30.000", "$30000", "1.500,50" -> número (formato es-AR). NaN si no es un precio.
+export function parsearPrecio(texto) {
+  const limpio = texto.replace(/[$\s]/g, '');
+  if (!/^\d[\d.,]*$/.test(limpio)) return NaN;
+  const conMiles = /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(limpio);
+  return parseFloat(conMiles ? limpio.replace(/\./g, '').replace(',', '.') : limpio.replace(',', '.'));
+}
+
+// Una línea por plato: "[cantidad] nombre precio-unitario".
+// Ej.: "2 hamburguesa 30000", "papas fritas $10.000", "3x cerveza 4500".
+export function parsearConsumos(texto) {
+  const items = [];
+  const invalidas = [];
+  texto.split('\n').forEach((linea) => {
+    const l = linea.trim();
+    if (!l) return;
+    const m = l.match(/^(?:(\d+)\s*[x×]?\s+)?(.+?)\s+(\$?\s*\d[\d.,]*)$/i);
+    const precio = m ? parsearPrecio(m[3]) : NaN;
+    if (!m || !(precio >= 0) || !m[2].trim()) {
+      invalidas.push(l);
+      return;
+    }
+    items.push({ nombre: m[2].trim(), cantidad: parseInt(m[1], 10) || 1, valorUnitario: precio });
+  });
+  return { items, invalidas };
+}
