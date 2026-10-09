@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
+import { PartesIguales, SegunIngresos, QuienPagoQue } from './ModosSimples';
+
+const MODOS = [
+  { id: 'consumo', etiqueta: '🍽️ Por consumo' },
+  { id: 'iguales', etiqueta: '➗ Partes iguales' },
+  { id: 'ingresos', etiqueta: '⚖️ Según ingresos' },
+  { id: 'cruzados', etiqueta: '💸 Quién pagó qué' },
+];
 
 export default function DividiCuentaApp() {
+  const [modo, setModo] = useState('consumo');
   // --- ESTADOS PRINCIPALES (INICIALIZADOS VACÍOS) ---
   const [comensales, setComensales] = useState([]);
   const [compartidos, setCompartidos] = useState([]);
@@ -297,6 +306,34 @@ export default function DividiCuentaApp() {
           )}
         </div>
 
+        {/* Selector de forma de dividir */}
+        <div className="flex gap-2 overflow-x-auto px-4 pt-4 pb-1" role="tablist">
+          {MODOS.map(m => (
+            <button
+              key={m.id}
+              role="tab"
+              aria-selected={modo === m.id}
+              onClick={() => setModo(m.id)}
+              className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition ${
+                modo === m.id
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400'
+              }`}
+            >
+              {m.etiqueta}
+            </button>
+          ))}
+        </div>
+
+        {modo !== 'consumo' && (
+          <div className="p-6">
+            {modo === 'iguales' && <PartesIguales />}
+            {modo === 'ingresos' && <SegunIngresos />}
+            {modo === 'cruzados' && <QuienPagoQue />}
+          </div>
+        )}
+
+        {modo === 'consumo' && (<>
         {/* Sección de Escaneo de Carta con IA */}
         <div className="p-6 border-b border-gray-100 bg-emerald-50/50">
           <h2 className="text-lg font-semibold text-emerald-800 mb-2">Escanear Menú con IA</h2>
@@ -567,6 +604,7 @@ export default function DividiCuentaApp() {
           )}
 
         </div>
+        </>)}
       </div>
     </div>
   );
