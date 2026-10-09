@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PartesIguales, SegunIngresos, QuienPagoQue } from './ModosSimples';
+import { parsearConsumos } from './calculos';
 
 const MODOS = [
   { id: 'consumo', etiqueta: '🍽️ Por consumo' },
@@ -22,6 +23,8 @@ export default function DividiCuentaApp() {
   const [itemCantidad, setItemCantidad] = useState(1);
   const [itemValor, setItemValor] = useState('');
   const [comensalSeleccionadoId, setComensalSeleccionadoId] = useState(null);
+  const [cargaEnLote, setCargaEnLote] = useState(false);
+  const [textoLote, setTextoLote] = useState('');
 
   // Estados temporales para plato compartido
   const [compNombre, setCompNombre] = useState('');
@@ -89,6 +92,18 @@ export default function DividiCuentaApp() {
     setItemNombre('');
     setItemCantidad(1);
     setItemValor('');
+  };
+
+  const loteParseado = parsearConsumos(textoLote);
+
+  const agregarLoteAComensal = () => {
+    if (loteParseado.items.length === 0 || !comensalSeleccionadoId) return;
+    const base = Date.now();
+    const nuevos = loteParseado.items.map((item, i) => ({ id: base + i, ...item }));
+    setComensales(comensales.map(c =>
+      c.id === comensalSeleccionadoId ? { ...c, items: [...c.items, ...nuevos] } : c
+    ));
+    setTextoLote('');
   };
 
   const eliminarItemDeComensal = (comensalId, itemId) => {
@@ -465,38 +480,101 @@ export default function DividiCuentaApp() {
           {/* Formulario para agregar consumo individual */}
           {comensales.length > 0 && (
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
-              <h3 className="font-semibold text-sm text-gray-700">Agregar Consumo Individual</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                <select 
-                  value={comensalSeleccionadoId || ''}
-                  onChange={(e) => setComensalSeleccionadoId(Number(e.target.value))}
-                  className="border border-gray-300 rounded-lg p-2 text-sm bg-white"
-                >
-                  {comensales.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h3 className="font-semibold text-sm text-gray-700">Agregar Consumo Individual</h3>
+                <div className="flex gap-1 text-xs">
+                  {[[false, 'Un plato'], [true, 'Varios platos']].map(([valor, etiqueta]) => (
+                    <button
+                      key={etiqueta}
+                      onClick={() => setCargaEnLote(valor)}
+                      className={`px-3 py-1 rounded-lg border transition ${
+                        cargaEnLote === valor
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400'
+                      }`}
+                    >
+                      {etiqueta}
+                    </button>
                   ))}
-                </select>
-                <input 
-                  type="text"
-                  placeholder="Nombre del plato"
-                  value={itemNombre}
-                  onChange={(e) => setItemNombre(e.target.value)}
-                  className="border border-gray-300 rounded-lg p-2 text-sm bg-white"
-                />
-                <input 
-                  type="number"
-                  placeholder="Precio"
-                  value={itemValor}
-                  onChange={(e) => setItemValor(e.target.value)}
-                  className="border border-gray-300 rounded-lg p-2 text-sm bg-white"
-                />
-                <button 
-                  onClick={agregarItemAComensal}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
-                >
-                  Añadir Plato
-                </button>
+                </div>
               </div>
+
+              {!cargaEnLote ? (
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <select
+                    value={comensalSeleccionadoId || ''}
+                    onChange={(e) => setComensalSeleccionadoId(Number(e.target.value))}
+                    className="border border-gray-300 rounded-lg p-2 text-sm bg-white"
+                  >
+                    {comensales.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Nombre del plato"
+                    value={itemNombre}
+                    onChange={(e) => setItemNombre(e.target.value)}
+                    className="border border-gray-300 rounded-lg p-2 text-sm bg-white"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Precio"
+                    value={itemValor}
+                    onChange={(e) => setItemValor(e.target.value)}
+                    className="border border-gray-300 rounded-lg p-2 text-sm bg-white"
+                  />
+                  <button
+                    onClick={agregarItemAComensal}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
+                  >
+                    Añadir Plato
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <select
+                    value={comensalSeleccionadoId || ''}
+                    onChange={(e) => setComensalSeleccionadoId(Number(e.target.value))}
+                    className="border border-gray-300 rounded-lg p-2 text-sm bg-white w-full sm:w-auto"
+                  >
+                    {comensales.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                  <textarea
+                    rows={5}
+                    value={textoLote}
+                    onChange={(e) => setTextoLote(e.target.value)}
+                    placeholder={`Un plato por línea: cantidad, nombre y precio unitario\n2 hamburguesa 30000\npapas fritas 10000\n3x cerveza 4500`}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white font-mono"
+                  />
+                  {loteParseado.items.length > 0 && (
+                    <ul className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg p-2 space-y-0.5">
+                      {loteParseado.items.map((it, i) => (
+                        <li key={i} className="flex justify-between">
+                          <span>{it.cantidad}x {it.nombre}</span>
+                          <span>${(it.cantidad * it.valorUnitario).toLocaleString()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {loteParseado.invalidas.length > 0 && (
+                    <p className="text-xs text-amber-600">
+                      No entendí estas líneas (falta el precio): {loteParseado.invalidas.join(' · ')}
+                    </p>
+                  )}
+                  <button
+                    onClick={agregarLoteAComensal}
+                    disabled={loteParseado.items.length === 0}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
+                  >
+                    {loteParseado.items.length > 1
+                      ? `Añadir ${loteParseado.items.length} platos`
+                      : 'Añadir platos'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
