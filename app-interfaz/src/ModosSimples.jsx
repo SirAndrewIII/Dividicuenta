@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useEstadoPersistente } from './useEstadoPersistente';
 import { dividirIgual, dividirPorIngresos, saldarDeudas, formatoPesos } from './calculos';
 
 const MAX_PERSONAS = 15;
@@ -97,10 +98,10 @@ const personasIniciales = () => [nuevaPersona(1), nuevaPersona(2)];
 
 // ---------- Partes iguales ----------
 export function PartesIguales() {
-  const [total, setTotal] = useState('');
-  const [motivo, setMotivo] = useState('');
-  const [propina, setPropina] = useState(0);
-  const [personas, setPersonas] = useState(personasIniciales);
+  const [total, setTotal] = useEstadoPersistente('iguales:total', '');
+  const [motivo, setMotivo] = useEstadoPersistente('iguales:motivo', '');
+  const [propina, setPropina] = useEstadoPersistente('iguales:propina', 0);
+  const [personas, setPersonas] = useEstadoPersistente('iguales:personas', personasIniciales);
 
   const totalConPropina = num(total) * (1 + num(propina) / 100);
   const montos = dividirIgual(totalConPropina, personas.length);
@@ -150,9 +151,9 @@ export function PartesIguales() {
 
 // ---------- Según ingresos ----------
 export function SegunIngresos() {
-  const [total, setTotal] = useState('');
-  const [motivo, setMotivo] = useState('');
-  const [personas, setPersonas] = useState(personasIniciales);
+  const [total, setTotal] = useEstadoPersistente('ingresos:total', '');
+  const [motivo, setMotivo] = useEstadoPersistente('ingresos:motivo', '');
+  const [personas, setPersonas] = useEstadoPersistente('ingresos:personas', personasIniciales);
 
   const ingresos = personas.map((p) => num(p.valor));
   const ingresosValidos = ingresos.every((i) => i > 0);
@@ -212,8 +213,8 @@ export function SegunIngresos() {
 
 // ---------- Quién pagó qué (gastos cruzados) ----------
 export function QuienPagoQue() {
-  const [motivo, setMotivo] = useState('');
-  const [personas, setPersonas] = useState(personasIniciales);
+  const [motivo, setMotivo] = useEstadoPersistente('cruzados:motivo', '');
+  const [personas, setPersonas] = useEstadoPersistente('cruzados:personas', personasIniciales);
 
   const pagos = personas.map((p) => num(p.valor));
   const total = pagos.reduce((a, b) => a + b, 0);

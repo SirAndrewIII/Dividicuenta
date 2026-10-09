@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PartesIguales, SegunIngresos, QuienPagoQue } from './ModosSimples';
 import { parsearConsumos } from './calculos';
+import { useEstadoPersistente } from './useEstadoPersistente';
 
 const MODOS = [
   { id: 'consumo', etiqueta: '🍽️ Por consumo' },
@@ -10,19 +11,19 @@ const MODOS = [
 ];
 
 export default function DividiCuentaApp() {
-  const [modo, setModo] = useState('consumo');
+  const [modo, setModo] = useEstadoPersistente('modo', 'consumo');
   // --- ESTADOS PRINCIPALES (INICIALIZADOS VACÍOS) ---
-  const [comensales, setComensales] = useState([]);
-  const [compartidos, setCompartidos] = useState([]);
+  const [comensales, setComensales] = useEstadoPersistente('comensales', []);
+  const [compartidos, setCompartidos] = useEstadoPersistente('compartidos', []);
 
   const [nuevoComensal, setNuevoComensal] = useState('');
-  const [propina, setPropina] = useState(10);
+  const [propina, setPropina] = useEstadoPersistente('propina', 10);
 
   // Estados temporales para consumo individual
   const [itemNombre, setItemNombre] = useState('');
   const [itemCantidad, setItemCantidad] = useState(1);
   const [itemValor, setItemValor] = useState('');
-  const [comensalSeleccionadoId, setComensalSeleccionadoId] = useState(null);
+  const [comensalSeleccionadoId, setComensalSeleccionadoId] = useEstadoPersistente('comensalSeleccionadoId', null);
   const [cargaEnLote, setCargaEnLote] = useState(false);
   const [textoLote, setTextoLote] = useState('');
 
@@ -32,7 +33,7 @@ export default function DividiCuentaApp() {
   const [compIdsSeleccionados, setCompIdsSeleccionados] = useState([]);
 
   // Estados para digitalización con IA
-  const [menuRestaurante, setMenuRestaurante] = useState(null);
+  const [menuRestaurante, setMenuRestaurante] = useEstadoPersistente('menuRestaurante', null);
   const [cargandoMenu, setCargandoMenu] = useState(false);
 
   // --- FUNCIONES DE COMENSALES ---
@@ -181,13 +182,13 @@ export default function DividiCuentaApp() {
         method: "POST",
         body: formData,
       });
-      const datos = await response.json(); 
+      const datos = await response.json().catch(() => ({}));
       
-      if (datos.status === "success") {
+      if (response.ok && datos.status === "success") {
         setMenuRestaurante(datos.menu);
         document.getElementById('seccion-menu-ia')?.scrollIntoView({ behavior: 'smooth' });
       } else {
-        alert("La IA no pudo procesar la carta. Intenta con un archivo más claro.");
+        alert(response.ok ? "La IA no pudo procesar la carta. Intenta con un archivo más claro." : (datos.detail || "No se pudo procesar la carta."));
       }
     } catch (error) {
       console.error("Error al subir el menú:", error);
@@ -340,24 +341,21 @@ export default function DividiCuentaApp() {
           ))}
         </div>
 
-        {modo !== 'consumo' && (
-          <div className="p-6">
-            {modo === 'iguales' && <PartesIguales />}
-            {modo === 'ingresos' && <SegunIngresos />}
-            {modo === 'cruzados' && <QuienPagoQue />}
-          </div>
-        )}
+        {/* Los modos quedan montados (ocultos) para no perder lo cargado al cambiar de pestaña */}
+        <div className="p-6" hidden={modo !== 'iguales'}><PartesIguales /></div>
+        <div className="p-6" hidden={modo !== 'ingresos'}><SegunIngresos /></div>
+        <div className="p-6" hidden={modo !== 'cruzados'}><QuienPagoQue /></div>
 
         {modo === 'consumo' && (<>
         {/* Sección de Escaneo de Carta con IA */}
         <div className="p-6 border-b border-gray-100 bg-emerald-50/50">
           <h2 className="text-lg font-semibold text-emerald-800 mb-2">Escanear Menú con IA</h2>
-          <p className="text-sm text-gray-600 mb-4">Sube una foto o un archivo PDF de la carta del restaurante para extraer los platos por categorías automáticamente.</p>
+          <p className="text-sm text-gray-600 mb-4">Sube una foto de la carta del restaurante para extraer los platos por categorías automáticamente.</p>
           
           <div className="flex items-center gap-4">
             <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-sm inline-flex items-center gap-2">
-              <span>📄 Subir foto o PDF de la carta</span>
-              <input type="file" accept="image/*,application/pdf" onChange={manejarSubidaCarta} className="hidden" />
+              <span>📄 Subir foto de la carta</span>
+              <input type="file" accept="image/*" onChange={manejarSubidaCarta} className="hidden" />
             </label>
             {cargandoMenu && <span className="text-sm text-emerald-700 font-medium animate-pulse">Analizando carta con IA...</span>}
           </div>
