@@ -1,1 +1,6 @@
 @import "tailwindcss";
+/* Placeholders legibles (WCAG AA): gray-500 sobre blanco = 4,83:1 */
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280;
+}

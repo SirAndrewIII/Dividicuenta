@@ -4,9 +4,9 @@
 const aCentavos = (n) => Math.round((Number(n) || 0) * 100);
 const aPesos = (c) => c / 100;
 
-// Reparte `total` según `pesos` (método del mayor resto). Devuelve pesos.
-export function repartirProporcional(total, pesos) {
-  const totalC = aCentavos(total);
+// Reparte `totalC` centavos según `pesos` (método del mayor resto).
+// La suma del resultado es siempre exactamente `totalC`.
+function repartirCentavos(totalC, pesos) {
   const suma = pesos.reduce((a, p) => a + p, 0);
   if (pesos.length === 0 || suma <= 0) return pesos.map(() => 0);
 
@@ -20,7 +20,89 @@ export function repartirProporcional(total, pesos) {
   for (let k = 0; resto > 0; k = (k + 1) % orden.length, resto--) {
     partes[orden[k].i] += 1;
   }
-  return partes.map(aPesos);
+  return partes;
+}
+
+// Reparte `total` según `pesos`. Devuelve pesos.
+export function repartirProporcional(total, pesos) {
+  return repartirCentavos(aCentavos(total), pesos).map(aPesos);
+}
+
+// Cuenta del modo «Por consumo»: consumos individuales + platos compartidos
+// (en partes iguales) + propina repartida según lo consumido. Todo en centavos,
+// así que los totales por persona suman exactamente el total de la cuenta.
+export function calcularCuentaPorConsumo(comensales, compartidos, propinaPct) {
+  const posicion = new Map(comensales.map((c, i) => [c.id, i]));
+
+  const individual = comensales.map((c) =>
+    c.items.reduce(
+      (acc, it) => acc + aCentavos((Number(it.cantidad) || 0) * (Number(it.valorUnitario) || 0)),
+      0,
+    ),
+  );
+
+  const compartido = comensales.map(() => 0);
+  const detalle = comensales.map(() => []);
+  compartidos.forEach((plato, k) => {
+    const participantes = plato.comensalesIds.filter((id) => posicion.has(id));
+    const n = participantes.length;
+    if (n === 0) return;
+    const totalC = aCentavos(plato.valorTotal);
+    const base = Math.floor(totalC / n);
+    const extra = totalC - base * n;
+    participantes.forEach((id, j) => {
+      // el centavo sobrante rota entre platos para no cargar siempre al mismo
+      const recibeExtra = (j - (k % n) + n) % n < extra;
+      const monto = base + (recibeExtra ? 1 : 0);
+      compartido[posicion.get(id)] += monto;
+      detalle[posicion.get(id)].push({ id: plato.id, nombre: plato.nombre, monto: aPesos(monto) });
+    });
+  });
+
+  const subtotales = individual.map((v, i) => v + compartido[i]);
+  const totalSubtotal = subtotales.reduce((a, b) => a + b, 0);
+  const pct = Number(propinaPct) || 0;
+  const totalPropina = totalSubtotal > 0 ? Math.round((totalSubtotal * pct) / 100) : 0;
+  const propinas = repartirCentavos(
+    totalPropina,
+    subtotales.map((s) => Math.max(0, s)),
+  );
+
+  const porComensal = comensales.map((_, i) => ({
+    subtotalIndividual: aPesos(individual[i]),
+    subtotalCompartido: aPesos(compartido[i]),
+    subtotal: aPesos(subtotales[i]),
+    propinaValor: aPesos(propinas[i]),
+    total: aPesos(subtotales[i] + propinas[i]),
+    detalleCompartido: detalle[i],
+  }));
+  const propinaAsignada = propinas.reduce((a, b) => a + b, 0);
+
+  return {
+    porComensal,
+    totalSubtotal: aPesos(totalSubtotal),
+    totalPropina: aPesos(propinaAsignada),
+    total: aPesos(totalSubtotal + propinaAsignada),
+  };
+}
+
+// Valida y limpia el menú que devuelve la IA: descarta lo que no tenga la
+// forma esperada. Devuelve null si no queda ningún plato utilizable.
+export function normalizarMenu(menu) {
+  if (!menu || !Array.isArray(menu.categorias)) return null;
+  const categorias = menu.categorias
+    .map((cat) => ({
+      nombre_categoria: String((cat && cat.nombre_categoria) || 'Otros'),
+      items: (Array.isArray(cat && cat.items) ? cat.items : [])
+        .map((it) => ({
+          nombre: String((it && it.nombre) || '').trim(),
+          descripcion: it && it.descripcion ? String(it.descripcion) : '',
+          precio: Number(it && it.precio),
+        }))
+        .filter((it) => it.nombre && Number.isFinite(it.precio) && it.precio >= 0),
+    }))
+    .filter((cat) => cat.items.length > 0);
+  return categorias.length > 0 ? { categorias } : null;
 }
 
 export function dividirIgual(total, cantidad) {
@@ -65,8 +147,18 @@ export function saldarDeudas(personas) {
   return transferencias;
 }
 
-export const formatoPesos = (n) =>
-  '$' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+// Formato es-AR: sin decimales si es entero y con 2 si hay centavos ($33,34).
+export const formatoPesos = (n) => {
+  const centavos = Math.round((Number(n) || 0) * 100);
+  const decimales = centavos % 100 === 0 ? 0 : 2;
+  return (
+    '$' +
+    (centavos / 100).toLocaleString('es-AR', {
+      minimumFractionDigits: decimales,
+      maximumFractionDigits: decimales,
+    })
+  );
+};
 
 // "30.000", "$30000", "1.500,50" -> número (formato es-AR). NaN si no es un precio.
 export function parsearPrecio(texto) {

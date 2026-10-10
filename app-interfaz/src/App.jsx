@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PartesIguales, SegunIngresos, QuienPagoQue } from './ModosSimples';
-import { parsearConsumos } from './calculos';
+import { parsearConsumos, calcularCuentaPorConsumo, normalizarMenu, formatoPesos } from './calculos';
 import { useEstadoPersistente } from './useEstadoPersistente';
 
 const MODOS = [
@@ -35,6 +35,8 @@ export default function DividiCuentaApp() {
   // Estados para digitalización con IA
   const [menuRestaurante, setMenuRestaurante] = useEstadoPersistente('menuRestaurante', null);
   const [cargandoMenu, setCargandoMenu] = useState(false);
+  const [aviso, setAviso] = useState(null);
+  const [confirmandoReinicio, setConfirmandoReinicio] = useState(false);
 
   // --- FUNCIONES DE COMENSALES ---
   const agregarComensal = () => {
@@ -171,11 +173,13 @@ export default function DividiCuentaApp() {
   // --- DIGITALIZACIÓN CON IA ---
   const manejarSubidaCarta = async (e) => {
     const archivo = e.target.files[0];
+    e.target.value = ''; // permite volver a elegir el mismo archivo
     if (!archivo) return;
 
     const formData = new FormData();
     formData.append("file", archivo);
 
+    setAviso(null);
     setCargandoMenu(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/parse-menu`, {
@@ -183,16 +187,19 @@ export default function DividiCuentaApp() {
         body: formData,
       });
       const datos = await response.json().catch(() => ({}));
-      
-      if (response.ok && datos.status === "success") {
-        setMenuRestaurante(datos.menu);
+      const menu = response.ok && datos.status === "success" ? normalizarMenu(datos.menu) : null;
+
+      if (menu) {
+        setMenuRestaurante(menu);
         document.getElementById('seccion-menu-ia')?.scrollIntoView({ behavior: 'smooth' });
+      } else if (response.ok) {
+        setAviso("No pudimos leer platos en esa imagen. Prueba con una foto más nítida y de frente.");
       } else {
-        alert(response.ok ? "La IA no pudo procesar la carta. Intenta con un archivo más claro." : (datos.detail || "No se pudo procesar la carta."));
+        setAviso(typeof datos.detail === 'string' ? datos.detail : "No se pudo procesar la carta. Intenta de nuevo.");
       }
     } catch (error) {
       console.error("Error al subir el menú:", error);
-      alert("Hubo un error conectando con el servidor de IA. Asegúrate de que FastAPI esté corriendo.");
+      setAviso("No pudimos conectar con el servicio de escaneo. Revisa tu conexión e intenta de nuevo.");
     } finally {
       setCargandoMenu(false);
     }
@@ -217,88 +224,68 @@ export default function DividiCuentaApp() {
   };
 
   const reiniciarTodo = () => {
-    if (window.confirm('¿Estás seguro de limpiar la pantalla y empezar de cero?')) {
-      setComensales([]);
-      setCompartidos([]);
-      setNuevoComensal('');
-      setPropina(10);
-      setItemNombre('');
-      setItemCantidad(1);
-      setItemValor('');
-      setComensalSeleccionadoId(null);
-      setCompNombre('');
-      setCompValor('');
-      setCompIdsSeleccionados([]);
-      setMenuRestaurante(null);
-    }
+    setComensales([]);
+    setCompartidos([]);
+    setNuevoComensal('');
+    setPropina(10);
+    setItemNombre('');
+    setItemCantidad(1);
+    setItemValor('');
+    setComensalSeleccionadoId(null);
+    setCompNombre('');
+    setCompValor('');
+    setCompIdsSeleccionados([]);
+    setMenuRestaurante(null);
+    setAviso(null);
+    setConfirmandoReinicio(false);
   };
 
-  const porcPropina = typeof propina === 'number' ? propina / 100 : 0;
+  // También valida lo que quedó guardado de sesiones anteriores
+  const menuSeguro = normalizarMenu(menuRestaurante);
 
-  const comensalesCalculados = comensales.map(comensal => {
-    const subtotalIndividual = comensal.items.reduce((acc, item) => {
-      const cant = Number(item.cantidad) || 0;
-      const val = Number(item.valorUnitario) || 0;
-      return acc + (cant * val);
-    }, 0);
-
-    const subtotalCompartido = compartidos.reduce((acc, comp) => {
-      if (comp.comensalesIds.includes(comensal.id)) {
-        const division = comp.valorTotal / (comp.comensalesIds.length || 1);
-        return acc + division;
-      }
-      return acc;
-    }, 0);
-
-    const subtotal = subtotalIndividual + subtotalCompartido;
-    const propinaValor = subtotal * porcPropina;
-    const total = subtotal + propinaValor;
-
-    return {
-      ...comensal,
-      subtotalIndividual,
-      subtotalCompartido,
-      subtotal,
-      propinaValor,
-      total
-    };
-  });
-
-  const granTotal = comensalesCalculados.reduce((acc, curr) => acc + curr.total, 0);
+  const cuenta = calcularCuentaPorConsumo(comensales, compartidos, propina);
+  const comensalesCalculados = comensales.map((c, i) => ({ ...c, ...cuenta.porComensal[i] }));
+  const granTotal = cuenta.total;
 
   const compartirWhatsApp = () => {
     if (comensalesCalculados.length === 0) return;
 
-    let mensaje = `🧾 *RESUMEN DE CUENTA - DividiCuenta* 🧾\n\n`;
-    
-    comensalesCalculados.forEach(c => {
-      mensaje += `👤 *${c.nombre}*\n`;
-      
-      if (c.items.length > 0) {
-        c.items.forEach(item => {
-          const subItem = (Number(item.cantidad) || 0) * (Number(item.valorUnitario) || 0);
-          mensaje += ` - ${item.cantidad}x ${item.nombre} ($${subItem.toLocaleString()})\n`;
-        });
-      }
+    let mensaje = `🧾 *RESUMEN DE CUENTA - DividiCuenta* 🧾
 
-      compartidos.forEach(comp => {
-        if (comp.comensalesIds.includes(c.id)) {
-          const parte = comp.valorTotal / comp.comensalesIds.length;
-          mensaje += ` - [Compartido] ${comp.nombre} ($${Math.round(parte).toLocaleString()})\n`;
-        }
+`;
+
+    comensalesCalculados.forEach(c => {
+      mensaje += `👤 *${c.nombre}*
+`;
+
+      c.items.forEach(item => {
+        const subItem = (Number(item.cantidad) || 0) * (Number(item.valorUnitario) || 0);
+        mensaje += ` - ${item.cantidad}x ${item.nombre} (${formatoPesos(subItem)})
+`;
       });
 
-      if (c.items.length === 0 && c.subtotalCompartido === 0) {
-        mensaje += ` - Sin consumos registrados\n`;
+      c.detalleCompartido.forEach(comp => {
+        mensaje += ` - [Compartido] ${comp.nombre} (${formatoPesos(comp.monto)})
+`;
+      });
+
+      if (c.items.length === 0 && c.detalleCompartido.length === 0) {
+        mensaje += ` - Sin consumos registrados
+`;
       }
 
-      mensaje += ` 🔸 Subtotal: $${Math.round(c.subtotal).toLocaleString()}\n`;
-      mensaje += ` 🔸 Propina (${propina}%): $${Math.round(c.propinaValor).toLocaleString()}\n`;
-      mensaje += ` ✅ *Total a pagar: $${Math.round(c.total).toLocaleString()}*\n\n`;
+      mensaje += ` 🔸 Subtotal: ${formatoPesos(c.subtotal)}
+`;
+      mensaje += ` 🔸 Propina (${propina || 0}%): ${formatoPesos(c.propinaValor)}
+`;
+      mensaje += ` ✅ *Total a pagar: ${formatoPesos(c.total)}*
+
+`;
     });
 
-    mensaje += `━━━━━━━━━━━━━━━━━━━\n`;
-    mensaje += `💰 *GRAN TOTAL FACTURA: $${Math.round(granTotal).toLocaleString()}*`;
+    mensaje += `━━━━━━━━━━━━━━━━━━━
+`;
+    mensaje += `💰 *GRAN TOTAL FACTURA: ${formatoPesos(granTotal)}*`;
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
     window.open(url, '_blank');
@@ -309,18 +296,28 @@ export default function DividiCuentaApp() {
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden pb-10 border border-gray-100">
         
         {/* Encabezado */}
-        <div className="bg-emerald-600 p-6 text-white text-center rounded-b-3xl shadow-md relative">
+        <div className="bg-emerald-700 p-6 text-white text-center rounded-b-3xl shadow-md relative">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-wide">DividiCuenta</h1>
           <p className="text-emerald-100 text-sm mt-1">Cuentas claras, amistades largas</p>
           {(comensales.length > 0 || menuRestaurante) && (
             <button 
-              onClick={reiniciarTodo}
-              className="absolute top-4 right-4 bg-emerald-700 hover:bg-emerald-800 text-emerald-100 hover:text-white text-xs px-3 py-2 rounded-xl font-medium transition"
+              onClick={() => setConfirmandoReinicio(true)}
+              className="absolute top-4 right-4 bg-emerald-800 hover:bg-emerald-900 text-emerald-100 hover:text-white text-xs px-3 py-2 rounded-xl font-medium transition"
             >
               Reiniciar
             </button>
           )}
         </div>
+
+        {confirmandoReinicio && (
+          <div role="alertdialog" aria-label="Confirmar reinicio" className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <span>¿Borrar todo lo cargado y empezar de cero?</span>
+            <span className="flex gap-2">
+              <button onClick={reiniciarTodo} className="rounded-lg bg-red-700 px-3 py-1.5 font-medium text-white hover:bg-red-800">Sí, borrar todo</button>
+              <button onClick={() => setConfirmandoReinicio(false)} className="rounded-lg border border-red-300 bg-white px-3 py-1.5 font-medium text-red-800 hover:bg-red-100">Cancelar</button>
+            </span>
+          </div>
+        )}
 
         {/* Selector de forma de dividir */}
         <div className="flex gap-2 overflow-x-auto px-4 pt-4 pb-1" role="tablist">
@@ -332,7 +329,7 @@ export default function DividiCuentaApp() {
               onClick={() => setModo(m.id)}
               className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition ${
                 modo === m.id
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400'
               }`}
             >
@@ -353,18 +350,21 @@ export default function DividiCuentaApp() {
           <p className="text-sm text-gray-600 mb-4">Sube una foto de la carta del restaurante para extraer los platos por categorías automáticamente.</p>
           
           <div className="flex items-center gap-4">
-            <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-sm inline-flex items-center gap-2">
+            <label className="cursor-pointer bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-sm inline-flex items-center gap-2">
               <span>📄 Subir foto de la carta</span>
               <input type="file" accept="image/*" onChange={manejarSubidaCarta} className="hidden" />
             </label>
-            {cargandoMenu && <span className="text-sm text-emerald-700 font-medium animate-pulse">Analizando carta con IA...</span>}
+            {cargandoMenu && <span role="status" className="text-sm text-emerald-700 font-medium animate-pulse">Analizando carta con IA...</span>}
           </div>
+          {aviso && (
+            <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{aviso}</p>
+          )}
 
-          {menuRestaurante && menuRestaurante.categorias && (
+          {menuSeguro && (
             <div id="seccion-menu-ia" className="mt-6 bg-white p-4 rounded-xl border border-emerald-200 shadow-sm space-y-6">
               <h3 className="font-bold text-emerald-900">Menú Organizado (Haz clic en un plato para agregarlo):</h3>
               
-              {menuRestaurante.categorias.map((cat, idxCat) => (
+              {menuSeguro.categorias.map((cat, idxCat) => (
                 <div key={idxCat} className="space-y-3">
                   <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider border-b border-emerald-100 pb-1">
                     {cat.nombre_categoria}
@@ -378,9 +378,9 @@ export default function DividiCuentaApp() {
                       >
                         <div className="pr-2">
                           <p className="font-medium text-gray-800 text-sm">{plato.nombre}</p>
-                          {plato.descripcion && <p className="text-xs text-gray-400 line-clamp-1">{plato.descripcion}</p>}
+                          {plato.descripcion && <p className="text-xs text-gray-500 line-clamp-1">{plato.descripcion}</p>}
                         </div>
-                        <span className="font-bold text-emerald-600 text-sm shrink-0">${Number(plato.precio).toLocaleString()}</span>
+                        <span className="font-bold text-emerald-700 text-sm shrink-0">{formatoPesos(plato.precio)}</span>
                       </div>
                     ))}
                   </div>
@@ -403,7 +403,7 @@ export default function DividiCuentaApp() {
             />
             <button 
               onClick={agregarComensal}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-sm font-medium transition shadow-sm"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2 rounded-xl text-sm font-medium transition shadow-sm"
             >
               Agregar Comensal
             </button>
@@ -423,7 +423,7 @@ export default function DividiCuentaApp() {
                     />
                     <button 
                       onClick={() => eliminarComensal(comensal.id)}
-                      className="text-red-500 hover:text-red-700 text-xs font-semibold px-2 py-1"
+                      className="text-red-700 hover:text-red-800 text-xs font-semibold px-2 py-1"
                     >
                       Eliminar
                     </button>
@@ -446,7 +446,7 @@ export default function DividiCuentaApp() {
                             onChange={(e) => modificarItemDeComensal(comensal.id, item.id, 'cantidad', e.target.value)}
                             className="w-10 text-center bg-white border border-gray-200 rounded px-1 text-xs"
                           />
-                          <span className="text-gray-400 text-xs">x</span>
+                          <span className="text-gray-500 text-xs">x</span>
                           <input 
                             type="number" 
                             value={item.valorUnitario}
@@ -455,7 +455,7 @@ export default function DividiCuentaApp() {
                           />
                           <button 
                             onClick={() => eliminarItemDeComensal(comensal.id, item.id)}
-                            className="text-red-400 hover:text-red-600 font-bold px-1 text-base"
+                            className="text-red-700 hover:text-red-800 font-bold px-1 text-base"
                           >
                             ×
                           </button>
@@ -463,7 +463,7 @@ export default function DividiCuentaApp() {
                       </div>
                     ))}
                     {comensal.items.length === 0 && (
-                      <p className="text-xs text-gray-400 italic">No hay consumos individuales registrados.</p>
+                      <p className="text-xs text-gray-500 italic">No hay consumos individuales registrados.</p>
                     )}
                   </div>
                 </div>
@@ -487,7 +487,7 @@ export default function DividiCuentaApp() {
                       onClick={() => setCargaEnLote(valor)}
                       className={`px-3 py-1 rounded-lg border transition ${
                         cargaEnLote === valor
-                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          ? 'bg-emerald-700 text-white border-emerald-700'
                           : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-400'
                       }`}
                     >
@@ -524,7 +524,7 @@ export default function DividiCuentaApp() {
                   />
                   <button
                     onClick={agregarItemAComensal}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
                   >
                     Añadir Plato
                   </button>
@@ -552,20 +552,20 @@ export default function DividiCuentaApp() {
                       {loteParseado.items.map((it, i) => (
                         <li key={i} className="flex justify-between">
                           <span>{it.cantidad}x {it.nombre}</span>
-                          <span>${(it.cantidad * it.valorUnitario).toLocaleString()}</span>
+                          <span>{formatoPesos(it.cantidad * it.valorUnitario)}</span>
                         </li>
                       ))}
                     </ul>
                   )}
                   {loteParseado.invalidas.length > 0 && (
-                    <p className="text-xs text-amber-600">
+                    <p className="text-xs text-amber-700">
                       No entendí estas líneas (falta el precio): {loteParseado.invalidas.join(' · ')}
                     </p>
                   )}
                   <button
                     onClick={agregarLoteAComensal}
                     disabled={loteParseado.items.length === 0}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
+                    className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
                   >
                     {loteParseado.items.length > 1
                       ? `Añadir ${loteParseado.items.length} platos`
@@ -596,7 +596,7 @@ export default function DividiCuentaApp() {
               />
               <button 
                 onClick={agregarPlatoCompartido}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
+                className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded-lg p-2 transition shadow-sm"
               >
                 Registrar Compartido
               </button>
@@ -611,7 +611,7 @@ export default function DividiCuentaApp() {
                       type="checkbox"
                       checked={compIdsSeleccionados.includes(c.id)}
                       onChange={() => toggleCheckboxCompartido(c.id)}
-                      className="rounded text-emerald-600 focus:ring-emerald-500"
+                      className="rounded text-emerald-700 focus:ring-emerald-500"
                     />
                     {c.nombre}
                   </label>
@@ -624,11 +624,11 @@ export default function DividiCuentaApp() {
                 <div key={comp.id} className="flex justify-between items-center text-sm bg-white p-2.5 rounded-lg border border-gray-200">
                   <div>
                     <span className="font-medium text-gray-800">{comp.nombre}</span>
-                    <span className="text-gray-500 text-xs ml-2">(${comp.valorTotal.toLocaleString()})</span>
+                    <span className="text-gray-500 text-xs ml-2">({formatoPesos(comp.valorTotal)})</span>
                   </div>
                   <button 
                     onClick={() => eliminarPlatoCompartido(comp.id)}
-                    className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                    className="text-red-700 hover:text-red-800 text-xs font-semibold"
                   >
                     Eliminar
                   </button>
@@ -657,22 +657,22 @@ export default function DividiCuentaApp() {
                   <div key={c.id} className="flex justify-between items-center text-sm border-b border-emerald-100/60 pb-2">
                     <div>
                       <span className="font-semibold text-gray-800">{c.nombre}</span>
-                      <span className="text-xs text-gray-500 block">Subtotal: ${Math.round(c.subtotal).toLocaleString()} + Propina: ${Math.round(c.propinaValor).toLocaleString()}</span>
+                      <span className="text-xs text-gray-500 block">Subtotal: {formatoPesos(c.subtotal)} + Propina: {formatoPesos(c.propinaValor)}</span>
                     </div>
-                    <span className="font-bold text-emerald-700">${Math.round(c.total).toLocaleString()}</span>
+                    <span className="font-bold text-emerald-700">{formatoPesos(c.total)}</span>
                   </div>
                 ))}
 
                 <div className="flex justify-between items-center pt-2 font-bold text-base text-gray-900">
                   <span>Gran Total Factura:</span>
-                  <span className="text-emerald-700">${Math.round(granTotal).toLocaleString()}</span>
+                  <span className="text-emerald-700">{formatoPesos(granTotal)}</span>
                 </div>
               </div>
 
               {/* Botón WhatsApp */}
               <button 
                 onClick={compartirWhatsApp}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-xl transition shadow-md flex justify-center items-center gap-2 text-sm"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-medium py-3 rounded-xl transition shadow-md flex justify-center items-center gap-2 text-sm"
               >
                 <span>Enviar por WhatsApp</span>
               </button>
