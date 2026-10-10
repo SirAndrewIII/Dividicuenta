@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { parsearConsumos, formatoPesos } from '../calculos';
 import { boton, campo } from '../estilos';
+import { MAX_CANTIDAD, MAX_LOTE, MAX_MONTO, MAX_TEXTO, errorDeMonto } from '../validacion';
 
 const MODOS_CARGA = [
   [false, 'Un plato'],
@@ -19,14 +20,28 @@ export default function FormularioConsumo({
 }) {
   const [enLote, setEnLote] = useState(false);
   const [textoLote, setTextoLote] = useState('');
+  const [error, setError] = useState(null);
   const lote = parsearConsumos(textoLote);
 
   const agregarUno = () => {
-    if (!nombre.trim() || !precio || isNaN(precio)) return;
-    if (onAgregarItems([{ nombre: nombre.trim(), cantidad: 1, valorUnitario: parseFloat(precio) }])) {
+    const problema = !nombre.trim()
+      ? 'Escribe el nombre del plato.'
+      : precio === ''
+        ? 'Ingresa el precio del plato.'
+        : errorDeMonto(precio, 'El precio');
+    if (problema) return setError(problema);
+
+    if (onAgregarItems([{ nombre: nombre.trim(), cantidad: 1, valorUnitario: Number(precio) }])) {
       onNombre('');
       onPrecio('');
+      setError(null);
     }
+  };
+
+  // Escribir en cualquier campo limpia el aviso anterior
+  const cambiar = (alCambiar) => (e) => {
+    setError(null);
+    alCambiar(e.target.value);
   };
 
   const agregarLote = () => {
@@ -75,22 +90,31 @@ export default function FormularioConsumo({
             type="text"
             aria-label="Nombre del plato"
             placeholder="Nombre del plato"
+            maxLength={MAX_TEXTO}
             value={nombre}
-            onChange={(e) => onNombre(e.target.value)}
+            onChange={cambiar(onNombre)}
             className={campo}
           />
           <input
             type="number"
             min="0"
+            max={MAX_MONTO}
             aria-label="Precio del plato"
+            aria-invalid={error !== null && error.includes('precio')}
+            aria-describedby={error ? 'error-consumo' : undefined}
             placeholder="Precio"
             value={precio}
-            onChange={(e) => onPrecio(e.target.value)}
+            onChange={cambiar(onPrecio)}
             className={campo}
           />
           <button onClick={agregarUno} className={boton}>
             Añadir plato
           </button>
+          {error && (
+            <p id="error-consumo" role="alert" className="sm:col-span-4 text-sm text-red-800">
+              {error}
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -98,6 +122,7 @@ export default function FormularioConsumo({
           <textarea
             rows={5}
             aria-label="Platos, uno por línea"
+            maxLength={MAX_LOTE}
             value={textoLote}
             onChange={(e) => setTextoLote(e.target.value)}
             placeholder={`Un plato por línea: cantidad, nombre y precio unitario\n2 hamburguesa 30000\npapas fritas 10000\n3x cerveza 4500`}
@@ -115,7 +140,7 @@ export default function FormularioConsumo({
           )}
           {lote.invalidas.length > 0 && (
             <p className="text-xs text-amber-700">
-              No entendí estas líneas (falta el precio): {lote.invalidas.join(' · ')}
+              No entendí estas líneas (revisa el precio y que la cantidad sea de 1 a {MAX_CANTIDAD}): {lote.invalidas.join(' · ')}
             </p>
           )}
           <button onClick={agregarLote} disabled={lote.items.length === 0} className={`${boton} w-full`}>

@@ -1,7 +1,10 @@
+import { MAX_TEXTO, esCantidadValida, esMontoValido } from './validacion';
+
 // Funciones puras de reparto. Trabajan en centavos enteros para que la suma
 // de las partes siempre coincida exactamente con el total.
 
-const aCentavos = (n) => Math.round((Number(n) || 0) * 100);
+// Un valor no finito (NaN, Infinity) cuenta como 0 en lugar de contagiar a todo el cálculo.
+const aCentavos = (n) => (Number.isFinite(Number(n)) ? Math.round(Number(n) * 100) : 0);
 const aPesos = (c) => c / 100;
 
 // Reparte `totalC` centavos según `pesos` (método del mayor resto).
@@ -170,6 +173,7 @@ export function parsearPrecio(texto) {
 
 // Una línea por plato: "[cantidad] nombre precio-unitario".
 // Ej.: "2 hamburguesa 30000", "papas fritas $10.000", "3x cerveza 4500".
+// Las líneas con cantidad o precio fuera de los límites van a `invalidas`.
 export function parsearConsumos(texto) {
   const items = [];
   const invalidas = [];
@@ -178,11 +182,12 @@ export function parsearConsumos(texto) {
     if (!l) return;
     const m = l.match(/^(?:(\d+)\s*[x×]?\s+)?(.+?)\s+(\$?\s*\d[\d.,]*)$/i);
     const precio = m ? parsearPrecio(m[3]) : NaN;
-    if (!m || !(precio >= 0) || !m[2].trim()) {
+    const cantidad = m && m[1] !== undefined ? parseInt(m[1], 10) : 1;
+    if (!m || !m[2].trim() || !esMontoValido(precio) || !esCantidadValida(cantidad)) {
       invalidas.push(l);
       return;
     }
-    items.push({ nombre: m[2].trim(), cantidad: parseInt(m[1], 10) || 1, valorUnitario: precio });
+    items.push({ nombre: m[2].trim().slice(0, MAX_TEXTO), cantidad, valorUnitario: precio });
   });
   return { items, invalidas };
 }

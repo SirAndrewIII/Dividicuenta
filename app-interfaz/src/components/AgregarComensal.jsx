@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { boton, campo } from '../estilos';
+import { MAX_NOMBRE } from '../validacion';
 
 export default function AgregarComensal({ onAgregar }) {
   const [nombre, setNombre] = useState('');
@@ -14,6 +15,7 @@ export default function AgregarComensal({ onAgregar }) {
         type="text"
         aria-label="Nombre del comensal"
         placeholder="Nombre del comensal"
+        maxLength={MAX_NOMBRE}
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && agregar()}

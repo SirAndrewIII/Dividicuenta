@@ -1,6 +1,16 @@
 import React from 'react';
 import { campo, boton, botonPeligro } from '../estilos';
 import { MAX_PERSONAS, nuevaPersona } from '../personas';
+import { MAX_MONTO, MAX_NOMBRE } from '../validacion';
+
+// Aviso de un valor inválido; se anuncia a los lectores de pantalla.
+export function Aviso({ children }) {
+  return (
+    <p role="alert" className="text-sm text-red-800 font-medium">
+      {children}
+    </p>
+  );
+}
 
 // Lista editable de personas; `etiquetaValor` activa una segunda columna numérica.
 export function ListaPersonas({ personas, setPersonas, etiquetaValor }) {
@@ -15,6 +25,7 @@ export function ListaPersonas({ personas, setPersonas, etiquetaValor }) {
             <input
               type="text"
               aria-label={`Nombre de la persona ${i + 1}`}
+              maxLength={MAX_NOMBRE}
               value={p.nombre}
               onChange={(e) => cambiar(p.id, 'nombre', e.target.value)}
               className={`${campo} flex-1 min-w-0`}
@@ -23,6 +34,7 @@ export function ListaPersonas({ personas, setPersonas, etiquetaValor }) {
               <input
                 type="number"
                 min="0"
+                max={MAX_MONTO}
                 aria-label={`${etiquetaValor} de ${p.nombre || `la persona ${i + 1}`}`}
                 placeholder={etiquetaValor}
                 value={p.valor}

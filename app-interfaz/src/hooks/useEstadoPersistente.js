@@ -4,11 +4,13 @@ const PREFIJO = 'dividicuenta:v1:';
 
 // Igual que useState, pero guarda el valor en localStorage para sobrevivir a
 // recargas. Si el almacenamiento no está disponible, funciona como useState.
-export function useEstadoPersistente(clave, inicial) {
+// `sanear` (opcional) limpia lo leído del almacenamiento: puede venir de una
+// versión anterior o haber sido alterado.
+export function useEstadoPersistente(clave, inicial, sanear = (v) => v) {
   const [valor, setValor] = useState(() => {
     try {
       const guardado = window.localStorage.getItem(PREFIJO + clave);
-      if (guardado !== null) return JSON.parse(guardado);
+      if (guardado !== null) return sanear(JSON.parse(guardado));
     } catch {
       // almacenamiento bloqueado o dato corrupto: se usa el valor inicial
     }

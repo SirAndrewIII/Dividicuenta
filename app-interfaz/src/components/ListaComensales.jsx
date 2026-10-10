@@ -1,11 +1,19 @@
 import React from 'react';
 import { botonPeligro, campoCompacto } from '../estilos';
+import { MAX_CANTIDAD, MAX_MONTO, MAX_NOMBRE, MAX_TEXTO } from '../validacion';
 
 // Edición en línea: sin borde visible hasta enfocar, con aro de foco claro.
 const campoInline =
   'bg-transparent border-b border-gray-400 hover:border-gray-600 min-h-10 focus-visible:outline-2 focus-visible:outline-emerald-700';
 
-export default function ListaComensales({ comensales, onRenombrar, onEliminar, onModificarItem, onEliminarItem }) {
+export default function ListaComensales({
+  comensales,
+  onRenombrar,
+  onEliminar,
+  onModificarItem,
+  onConfirmarItem,
+  onEliminarItem,
+}) {
   if (comensales.length === 0) {
     return (
       <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-300">
@@ -22,6 +30,7 @@ export default function ListaComensales({ comensales, onRenombrar, onEliminar, o
             <input
               type="text"
               aria-label={`Nombre del comensal ${i + 1}`}
+              maxLength={MAX_NOMBRE}
               value={comensal.nombre}
               onChange={(e) => onRenombrar(comensal.id, e.target.value)}
               className={`${campoInline} font-bold text-gray-800 text-base min-w-0 flex-1`}
@@ -41,6 +50,7 @@ export default function ListaComensales({ comensales, onRenombrar, onEliminar, o
                 <input
                   type="text"
                   aria-label={`Nombre del plato de ${comensal.nombre}`}
+                  maxLength={MAX_TEXTO}
                   value={item.nombre}
                   onChange={(e) => onModificarItem(comensal.id, item.id, 'nombre', e.target.value)}
                   className={`${campoInline} flex-1 min-w-0 text-gray-700`}
@@ -48,17 +58,24 @@ export default function ListaComensales({ comensales, onRenombrar, onEliminar, o
                 <div className="flex items-center gap-1 shrink-0">
                   <input
                     type="number"
+                    min="1"
+                    max={MAX_CANTIDAD}
+                    step="1"
                     aria-label={`Cantidad de ${item.nombre}`}
                     value={item.cantidad}
                     onChange={(e) => onModificarItem(comensal.id, item.id, 'cantidad', e.target.value)}
+                    onBlur={() => onConfirmarItem(comensal.id, item.id)}
                     className={`${campoCompacto} w-14 text-center`}
                   />
                   <span aria-hidden="true" className="text-gray-500 text-xs">x</span>
                   <input
                     type="number"
+                    min="0"
+                    max={MAX_MONTO}
                     aria-label={`Precio unitario de ${item.nombre}`}
                     value={item.valorUnitario}
                     onChange={(e) => onModificarItem(comensal.id, item.id, 'valorUnitario', e.target.value)}
+                    onBlur={() => onConfirmarItem(comensal.id, item.id)}
                     className={`${campoCompacto} w-20 sm:w-24 text-right`}
                   />
                   <button
