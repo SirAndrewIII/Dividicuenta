@@ -10,7 +10,7 @@ export default function ConfirmarReinicio({ onConfirmar, onCancelar }) {
       onKeyDown={(e) => e.key === 'Escape' && onCancelar()}
       className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
     >
-      <span>¿Borrar todo lo cargado y empezar de cero?</span>
+      <span>¿Borrar todo lo cargado en todos los modos y empezar de cero?</span>
       <span className="flex gap-2">
         <button
           onClick={onConfirmar}

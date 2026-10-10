@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const PREFIJO = 'dividicuenta:v1:';
+import { PREFIJO } from '../almacenamiento';
 
 // Igual que useState, pero guarda el valor en localStorage para sobrevivir a
 // recargas. Si el almacenamiento no está disponible, funciona como useState.

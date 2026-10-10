@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { dividirPorIngresos, formatoPesos } from '../calculos';
 import { campo } from '../estilos';
 import { useEstadoPersistente } from '../hooks/useEstadoPersistente';
@@ -11,6 +11,9 @@ export default function SegunIngresos() {
   const [total, setTotal] = useEstadoPersistente('ingresos:total', '');
   const [motivo, setMotivo] = useEstadoPersistente('ingresos:motivo', '');
   const [personas, setPersonas] = useEstadoPersistente('ingresos:personas', personasIniciales, sanearPersonas);
+
+  // Los ingresos individuales no se comparten por WhatsApp salvo que se pida
+  const [incluirIngresos, setIncluirIngresos] = useState(false);
 
   const ingresos = personas.map((p) => num(p.valor));
   const error =
@@ -42,7 +45,9 @@ export default function SegunIngresos() {
       {listo && (
         <Resultado
           onCompartir={() =>
-            abrirWhatsApp(mensajeIngresos({ motivo, total: num(total), personas, ingresos, montos, porcentajes, esfuerzo }))
+            abrirWhatsApp(
+              mensajeIngresos({ motivo, total: num(total), personas, ingresos, montos, porcentajes, esfuerzo, incluirIngresos }),
+            )
           }
         >
           {personas.map((p, i) => (
@@ -56,6 +61,15 @@ export default function SegunIngresos() {
           <p className="text-xs text-gray-600 pt-1 text-center font-medium">
             <span aria-hidden="true">📊 </span>Esfuerzo parejo: todos destinan el {esfuerzo.toFixed(1)}% de sus ingresos.
           </p>
+          <label className="flex items-center gap-2 min-h-11 text-xs text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={incluirIngresos}
+              onChange={(e) => setIncluirIngresos(e.target.checked)}
+              className="size-4 accent-emerald-700"
+            />
+            Mostrar el ingreso de cada persona en el mensaje de WhatsApp
+          </label>
         </Resultado>
       )}
     </div>

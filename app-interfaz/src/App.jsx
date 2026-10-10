@@ -5,6 +5,7 @@ import PartesIguales from './components/PartesIguales';
 import QuienPagoQue from './components/QuienPagoQue';
 import SegunIngresos from './components/SegunIngresos';
 import SelectorModo from './components/SelectorModo';
+import { borrarDatosGuardados } from './almacenamiento';
 import { idPanel, idTab } from './modos';
 import { useCuentaPorConsumo } from './hooks/useCuentaPorConsumo';
 import { useEstadoPersistente } from './hooks/useEstadoPersistente';
@@ -17,7 +18,10 @@ export default function DividiCuentaApp() {
   const [clave, setClave] = useState(0);
   const botonReiniciar = useRef(null);
 
+  // Borra lo de todos los modos: primero el guardado (los modos lo releen al
+  // volver a montarse con la nueva clave) y después el estado de «Por consumo».
   const reiniciar = () => {
+    borrarDatosGuardados();
     cuenta.reiniciar();
     setClave(clave + 1);
     setConfirmandoReinicio(false);
@@ -42,15 +46,13 @@ export default function DividiCuentaApp() {
         <header className="bg-emerald-700 p-6 text-white text-center rounded-b-3xl shadow-md relative">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-wide">DividiCuenta</h1>
           <p className="text-emerald-100 text-sm mt-1">Cuentas claras, amistades largas</p>
-          {cuenta.hayDatos && (
-            <button
-              ref={botonReiniciar}
-              onClick={() => setConfirmandoReinicio(true)}
-              className="absolute top-4 right-4 bg-emerald-800 hover:bg-emerald-900 text-emerald-100 hover:text-white text-xs px-3 min-h-11 rounded-xl font-medium transition"
-            >
-              Reiniciar
-            </button>
-          )}
+          <button
+            ref={botonReiniciar}
+            onClick={() => setConfirmandoReinicio(true)}
+            className="absolute top-4 right-4 bg-emerald-800 hover:bg-emerald-900 text-emerald-100 hover:text-white text-xs px-3 min-h-11 rounded-xl font-medium transition"
+          >
+            Reiniciar
+          </button>
         </header>
 
         {confirmandoReinicio && <ConfirmarReinicio onConfirmar={reiniciar} onCancelar={cancelarReinicio} />}

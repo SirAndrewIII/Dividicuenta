@@ -21,14 +21,20 @@ export function ListaPersonas({ personas, setPersonas, etiquetaValor }) {
     <div className="space-y-2">
       <ul className="space-y-2">
         {personas.map((p, i) => (
-          <li key={p.id} className="flex gap-2 items-center">
+          // En pantallas angostas el importe baja a su propia fila para que el nombre se lea completo
+          <li
+            key={p.id}
+            className={`grid gap-2 items-center ${
+              etiquetaValor ? 'grid-cols-[1fr_auto] sm:grid-cols-[1fr_8rem_auto]' : 'grid-cols-[1fr_auto]'
+            }`}
+          >
             <input
               type="text"
               aria-label={`Nombre de la persona ${i + 1}`}
               maxLength={MAX_NOMBRE}
               value={p.nombre}
               onChange={(e) => cambiar(p.id, 'nombre', e.target.value)}
-              className={`${campo} flex-1 min-w-0`}
+              className={`${campo} min-w-0 order-1 sm:order-none`}
             />
             {etiquetaValor && (
               <input
@@ -39,13 +45,13 @@ export function ListaPersonas({ personas, setPersonas, etiquetaValor }) {
                 placeholder={etiquetaValor}
                 value={p.valor}
                 onChange={(e) => cambiar(p.id, 'valor', e.target.value)}
-                className={`${campo} w-32`}
+                className={`${campo} min-w-0 col-span-2 order-3 sm:col-span-1 sm:order-none`}
               />
             )}
             <button
               onClick={() => setPersonas(personas.filter((x) => x.id !== p.id))}
               disabled={personas.length <= 2}
-              className={`${botonPeligro} text-lg disabled:opacity-40`}
+              className={`${botonPeligro} text-lg disabled:opacity-40 order-2 sm:order-none`}
               aria-label={`Eliminar a ${p.nombre || `la persona ${i + 1}`}`}
             >
               <span aria-hidden="true">×</span>

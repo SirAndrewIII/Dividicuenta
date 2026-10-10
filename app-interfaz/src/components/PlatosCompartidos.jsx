@@ -9,9 +9,13 @@ export default function PlatosCompartidos({ comensales, compartidos, onAgregar, 
   const [ids, setIds] = useState([]);
   const [error, setError] = useState(null);
 
+  const existe = (id) => comensales.some((c) => c.id === id);
+  // Una selección puede quedar apuntando a alguien que ya se eliminó
+  const idsVigentes = ids.filter(existe);
+
   const alternar = (id) => {
     setError(null);
-    setIds(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+    setIds(idsVigentes.includes(id) ? idsVigentes.filter((x) => x !== id) : [...idsVigentes, id]);
   };
 
   const registrar = () => {
@@ -20,10 +24,10 @@ export default function PlatosCompartidos({ comensales, compartidos, onAgregar, 
       : valor === ''
         ? 'Ingresa el valor total del plato.'
         : errorDeMonto(valor, 'El valor') ||
-          (ids.length === 0 ? 'Elige quiénes lo comparten.' : null);
+          (idsVigentes.length === 0 ? 'Elige quiénes lo comparten.' : null);
     if (problema) return setError(problema);
 
-    if (onAgregar({ nombre: nombre.trim(), valorTotal: Number(valor), comensalesIds: [...ids] })) {
+    if (onAgregar({ nombre: nombre.trim(), valorTotal: Number(valor), comensalesIds: idsVigentes })) {
       setNombre('');
       setValor('');
       setIds([]);
@@ -82,7 +86,7 @@ export default function PlatosCompartidos({ comensales, compartidos, onAgregar, 
             >
               <input
                 type="checkbox"
-                checked={ids.includes(c.id)}
+                checked={idsVigentes.includes(c.id)}
                 onChange={() => alternar(c.id)}
                 className="size-4 accent-emerald-700"
               />
@@ -93,21 +97,34 @@ export default function PlatosCompartidos({ comensales, compartidos, onAgregar, 
       )}
 
       <ul className="space-y-2 pt-2">
-        {compartidos.map((comp) => (
-          <li key={comp.id} className="flex justify-between items-center text-sm bg-white p-2.5 rounded-lg border border-gray-200">
-            <div>
-              <span className="font-medium text-gray-800">{comp.nombre}</span>
-              <span className="text-gray-500 text-xs ml-2">({formatoPesos(comp.valorTotal)})</span>
-            </div>
-            <button
-              onClick={() => onEliminar(comp.id)}
-              aria-label={`Eliminar ${comp.nombre}`}
-              className={`${botonPeligro} text-xs`}
+        {compartidos.map((comp) => {
+          const sinParticipantes = !comp.comensalesIds.some(existe);
+          return (
+            <li
+              key={comp.id}
+              className={`flex justify-between items-center gap-2 text-sm bg-white p-2.5 rounded-lg border ${
+                sinParticipantes ? 'border-red-700' : 'border-gray-200'
+              }`}
             >
-              Eliminar
-            </button>
-          </li>
-        ))}
+              <div>
+                <span className="font-medium text-gray-800">{comp.nombre}</span>
+                <span className="text-gray-500 text-xs ml-2">({formatoPesos(comp.valorTotal)})</span>
+                {sinParticipantes && (
+                  <span className="block text-xs font-medium text-red-800">
+                    Sin participantes: no se le cobra a nadie. Elimínalo y regístralo de nuevo.
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => onEliminar(comp.id)}
+                aria-label={`Eliminar ${comp.nombre}`}
+                className={`${botonPeligro} text-xs`}
+              >
+                Eliminar
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

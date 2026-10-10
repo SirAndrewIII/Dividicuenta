@@ -21,7 +21,7 @@ export default function ModoConsumo({ cuenta }) {
 
   const compartir = () => {
     if (cuenta.comensalesCalculados.length === 0) return;
-    abrirWhatsApp(mensajeConsumo(cuenta.comensalesCalculados, cuenta.propina, cuenta.granTotal));
+    abrirWhatsApp(mensajeConsumo(cuenta.comensalesCalculados, cuenta.propina, cuenta.granTotal, cuenta.sinAsignar));
   };
 
   return (
@@ -64,7 +64,10 @@ export default function ModoConsumo({ cuenta }) {
           <ResumenCuenta
             comensales={cuenta.comensalesCalculados}
             propina={cuenta.propina}
+            errorPropina={cuenta.errorPropina}
+            hayErrores={cuenta.hayErrores}
             granTotal={cuenta.granTotal}
+            sinAsignar={cuenta.sinAsignar}
             onPropina={cuenta.cambiarPropina}
             onCompartir={compartir}
           />

@@ -4,7 +4,7 @@ import { campo } from '../estilos';
 import { useEstadoPersistente } from '../hooks/useEstadoPersistente';
 import { abrirWhatsApp, mensajeIguales } from '../mensajes';
 import { num, personasIniciales, sanearPersonas } from '../personas';
-import { MAX_MONTO, MAX_TEXTO, errorDeMonto, sanearPropina } from '../validacion';
+import { MAX_MONTO, MAX_TEXTO, errorDeMonto, errorDePropina, sanearPropina } from '../validacion';
 import { Aviso, Campo, Fila, ListaPersonas, Resultado } from './comunes';
 
 export default function PartesIguales() {
@@ -13,16 +13,12 @@ export default function PartesIguales() {
   const [propina, setPropina] = useEstadoPersistente('iguales:propina', 0, (v) => sanearPropina(v, 0));
   const [personas, setPersonas] = useEstadoPersistente('iguales:personas', personasIniciales, sanearPersonas);
 
-  const error = errorDeMonto(total, 'El total');
+  const errorTotal = errorDeMonto(total, 'El total');
+  const errorPropina = errorDePropina(propina);
+  const error = errorTotal || errorPropina;
   const totalConPropina = num(total) * (1 + num(propina) / 100);
   const montos = dividirIgual(totalConPropina, personas.length);
   const listo = num(total) > 0 && !error;
-
-  // La propina va de 0 a 100; un valor fuera de rango se ignora
-  const cambiarPropina = (texto) => {
-    const n = Number(texto);
-    if (texto === '' || (n >= 0 && n <= 100)) setPropina(texto);
-  };
 
   return (
     <div className="space-y-4">
@@ -34,10 +30,10 @@ export default function PartesIguales() {
           <input className={`${campo} w-full`} maxLength={MAX_TEXTO} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Asado del sábado" />
         </Campo>
         <Campo etiqueta="Total de la cuenta">
-          <input type="number" min="0" max={MAX_MONTO} aria-invalid={error !== null} className={`${campo} w-full`} value={total} onChange={(e) => setTotal(e.target.value)} />
+          <input type="number" min="0" max={MAX_MONTO} aria-invalid={errorTotal !== null} className={`${campo} w-full`} value={total} onChange={(e) => setTotal(e.target.value)} />
         </Campo>
         <Campo etiqueta="Propina (%)">
-          <input type="number" min="0" max="100" className={`${campo} w-full`} value={propina} onChange={(e) => cambiarPropina(e.target.value)} />
+          <input type="number" min="0" max="100" aria-invalid={errorPropina !== null} className={`${campo} w-full`} value={propina} onChange={(e) => setPropina(e.target.value)} />
         </Campo>
       </div>
       {error && <Aviso>{error}</Aviso>}

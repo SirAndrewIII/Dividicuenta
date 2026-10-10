@@ -6,7 +6,7 @@ export function abrirWhatsApp(mensaje) {
   window.open(url(mensaje), '_blank', 'noopener');
 }
 
-export function mensajeConsumo(comensales, propina, granTotal) {
+export function mensajeConsumo(comensales, propina, granTotal, sinAsignar = 0) {
   const bloques = comensales.map((c) => {
     const lineas = [`👤 *${c.nombre}*`];
     c.items.forEach((item) => {
@@ -34,6 +34,7 @@ export function mensajeConsumo(comensales, propina, granTotal) {
     '',
     '━━━━━━━━━━━━━━━━━━━',
     `💰 *GRAN TOTAL FACTURA: ${formatoPesos(granTotal)}*`,
+    ...(sinAsignar > 0 ? [`⚠️ Sin asignar (platos compartidos sin participantes): ${formatoPesos(sinAsignar)}`] : []),
   ].join('\n');
 }
 
@@ -46,16 +47,19 @@ export function mensajeIguales({ motivo, total, propina, personas, montos }) {
   ].join('\n');
 }
 
-export function mensajeIngresos({ motivo, total, personas, ingresos, montos, porcentajes, esfuerzo }) {
+// Los ingresos individuales son datos sensibles: solo se incluyen si el usuario lo pide.
+export function mensajeIngresos({ motivo, total, personas, ingresos, montos, porcentajes, esfuerzo, incluirIngresos = false }) {
   return [
     '🏠 *División justa según ingresos - DividiCuenta*',
     `📝 Motivo: ${motivo.trim() || 'Gastos compartidos'}`,
     `💰 Gasto total: ${formatoPesos(total)}`,
     '',
-    ...personas.map(
-      (p, i) =>
-        `• *${p.nombre}*: pone ${formatoPesos(montos[i])} (${porcentajes[i].toFixed(1)}% | ingresos ${formatoPesos(ingresos[i])})`,
-    ),
+    ...personas.map((p, i) => {
+      const detalle = incluirIngresos
+        ? `${porcentajes[i].toFixed(1)}% | ingresos ${formatoPesos(ingresos[i])}`
+        : `${porcentajes[i].toFixed(1)}%`;
+      return `• *${p.nombre}*: pone ${formatoPesos(montos[i])} (${detalle})`;
+    }),
     '',
     `📊 Esfuerzo parejo: todos destinan el ${esfuerzo.toFixed(1)}% de lo que ganan.`,
   ].join('\n');
