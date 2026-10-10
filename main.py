@@ -8,7 +8,10 @@ from google.genai import types
 import os
 import json
 import time
+import logging
 from collections import defaultdict, deque
+
+logger = logging.getLogger("dividicuenta")
 
 app = FastAPI()
 
@@ -121,15 +124,36 @@ async def parse_menu(request: Request, file: UploadFile = File(...)):
             ),
         )
 
-        texto_respuesta = response.text.strip()
-        datos_menu = json.loads(texto_respuesta)
+        try:
+            datos_menu = json.loads(response.text.strip())
+        except (ValueError, AttributeError):
+            logger.exception("Gemini devolvió una respuesta que no es JSON")
+            raise HTTPException(
+                status_code=502,
+                detail="No pudimos interpretar la carta. Prueba con otra foto.",
+            )
+
+        if (
+            not isinstance(datos_menu, dict)
+            or datos_menu.get("status") != "success"
+            or not isinstance(datos_menu.get("menu", {}).get("categorias"), list)
+        ):
+            logger.error("Gemini devolvió un JSON con forma inesperada")
+            raise HTTPException(
+                status_code=502,
+                detail="No pudimos interpretar la carta. Prueba con otra foto.",
+            )
         return datos_menu
 
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"Error al procesar el menú con IA: {e}")
-        return {"status": "error", "message": str(e)}
+    except Exception:
+        # El detalle va solo al log del servidor; el cliente recibe un mensaje genérico.
+        logger.exception("Error al procesar el menú con IA")
+        raise HTTPException(
+            status_code=502,
+            detail="El servicio de escaneo no está disponible en este momento. Intenta de nuevo en unos minutos.",
+        )
 
 
 @app.get("/")

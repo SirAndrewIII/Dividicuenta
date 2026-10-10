@@ -6,7 +6,7 @@ const MAX_PERSONAS = 15;
 const inputCls =
   'border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500';
 const btnCls =
-  'bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition shadow-sm';
+  'bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-xl transition shadow-sm';
 
 const nuevaPersona = (n) => ({ id: Date.now() + n, nombre: `Persona ${n}`, valor: '' });
 const num = (v) => parseFloat(v) || 0;
@@ -43,7 +43,7 @@ function ListaPersonas({ personas, setPersonas, etiquetaValor }) {
           <button
             onClick={() => setPersonas(personas.filter((x) => x.id !== p.id))}
             disabled={personas.length <= 2}
-            className="text-red-400 hover:text-red-600 disabled:opacity-30 font-bold px-2 text-lg"
+            className="text-red-700 hover:text-red-800 disabled:opacity-30 font-bold px-2 text-lg"
             aria-label="Eliminar persona"
           >
             ×
@@ -190,7 +190,7 @@ export function SegunIngresos() {
       </div>
       <ListaPersonas personas={personas} setPersonas={setPersonas} etiquetaValor="Ingreso" />
       {num(total) > 0 && !ingresosValidos && (
-        <p className="text-xs text-amber-600 font-medium">Cargá el ingreso de cada persona (mayor a 0).</p>
+        <p className="text-xs text-amber-700 font-medium">Cargá el ingreso de cada persona (mayor a 0).</p>
       )}
       {listo && (
         <Resultado onCompartir={compartir}>
