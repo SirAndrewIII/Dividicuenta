@@ -1,6 +1,24 @@
 @import "tailwindcss";
+
 /* Placeholders legibles (WCAG AA): gray-500 sobre blanco = 4,83:1 */
 input::placeholder,
 textarea::placeholder {
   color: #6b7280;
+}
+
+/* Aro de foco visible para quien navega con teclado */
+:focus-visible {
+  outline: 2px solid #047857;
+  outline-offset: 2px;
+}
+
+/* Respeta a quien pide menos movimiento */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
 }
