@@ -36,6 +36,7 @@ export default function ModoConsumo({ cuenta }) {
           onRenombrar={cuenta.renombrarComensal}
           onEliminar={cuenta.eliminarComensal}
           onModificarItem={cuenta.modificarItem}
+          onConfirmarItem={cuenta.confirmarItem}
           onEliminarItem={cuenta.eliminarItem}
         />
 

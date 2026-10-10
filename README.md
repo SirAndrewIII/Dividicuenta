@@ -11,6 +11,17 @@ Divide la cuenta entre amigos de cuatro formas:
 
 Todos los modos pueden compartir el resultado por WhatsApp. Lo que cargas se guarda en el navegador (`localStorage`), así que sobrevive a recargas; no hay base de datos ni cuentas de usuario.
 
+## Reglas de validación
+
+Los límites viven en `app-interfaz/src/validacion.js`:
+
+- **Precios y montos:** de 0 a 1.000.000.000. El 0 sirve para una cortesía; no se admiten descuentos negativos.
+- **Cantidad de un plato:** entero de 1 a 99.
+- **Propina:** de 0 a 100.
+- **Nombres:** hasta 40 caracteres (personas) y 60 (platos y motivos).
+- Un valor fuera de rango se rechaza con un mensaje que dice por qué; al editar un plato ya cargado simplemente no se acepta la tecla.
+- Lo guardado en el navegador se sanea al cargar, por si viene de una versión anterior o fue alterado.
+
 ## Estructura
 
 ```

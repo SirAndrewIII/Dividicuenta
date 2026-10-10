@@ -3,13 +3,17 @@ import { dividirIgual, formatoPesos, saldarDeudas } from '../calculos';
 import { campo } from '../estilos';
 import { useEstadoPersistente } from '../hooks/useEstadoPersistente';
 import { abrirWhatsApp, mensajeCruzados } from '../mensajes';
-import { num, personasIniciales } from '../personas';
-import { Campo, Fila, ListaPersonas, Resultado } from './comunes';
+import { num, personasIniciales, sanearPersonas } from '../personas';
+import { MAX_TEXTO, errorDeMonto } from '../validacion';
+import { Aviso, Campo, Fila, ListaPersonas, Resultado } from './comunes';
 
 export default function QuienPagoQue() {
   const [motivo, setMotivo] = useEstadoPersistente('cruzados:motivo', '');
-  const [personas, setPersonas] = useEstadoPersistente('cruzados:personas', personasIniciales);
+  const [personas, setPersonas] = useEstadoPersistente('cruzados:personas', personasIniciales, sanearPersonas);
 
+  const error =
+    personas.map((p, i) => errorDeMonto(p.valor, `Lo que pagó ${p.nombre || `la persona ${i + 1}`}`)).find(Boolean) ||
+    null;
   const pagos = personas.map((p) => num(p.valor));
   const total = pagos.reduce((a, b) => a + b, 0);
   const porPersona = dividirIgual(total, personas.length);
@@ -24,10 +28,11 @@ export default function QuienPagoQue() {
         quedar a mano.
       </p>
       <Campo etiqueta="Motivo (opcional)">
-        <input className={`${campo} w-full`} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Gastos del viaje" />
+        <input className={`${campo} w-full`} maxLength={MAX_TEXTO} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Gastos del viaje" />
       </Campo>
       <ListaPersonas personas={personas} setPersonas={setPersonas} etiquetaValor="Pagó" />
-      {total > 0 && (
+      {error && <Aviso>{error}</Aviso>}
+      {total > 0 && !error && (
         <Resultado
           onCompartir={() =>
             abrirWhatsApp(mensajeCruzados({ motivo, total, cantidad: personas.length, transferencias }))

@@ -1,20 +1,40 @@
 import React, { useState } from 'react';
 import { formatoPesos } from '../calculos';
 import { boton, botonPeligro, campo } from '../estilos';
+import { MAX_MONTO, MAX_TEXTO, errorDeMonto } from '../validacion';
 
 export default function PlatosCompartidos({ comensales, compartidos, onAgregar, onEliminar }) {
   const [nombre, setNombre] = useState('');
   const [valor, setValor] = useState('');
   const [ids, setIds] = useState([]);
+  const [error, setError] = useState(null);
 
-  const alternar = (id) => setIds(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  const alternar = (id) => {
+    setError(null);
+    setIds(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  };
 
   const registrar = () => {
-    if (!nombre.trim() || !valor || isNaN(valor) || ids.length === 0) return;
-    onAgregar({ nombre: nombre.trim(), valorTotal: parseFloat(valor), comensalesIds: [...ids] });
-    setNombre('');
-    setValor('');
-    setIds([]);
+    const problema = !nombre.trim()
+      ? 'Escribe el nombre del plato compartido.'
+      : valor === ''
+        ? 'Ingresa el valor total del plato.'
+        : errorDeMonto(valor, 'El valor') ||
+          (ids.length === 0 ? 'Elige quiénes lo comparten.' : null);
+    if (problema) return setError(problema);
+
+    if (onAgregar({ nombre: nombre.trim(), valorTotal: Number(valor), comensalesIds: [...ids] })) {
+      setNombre('');
+      setValor('');
+      setIds([]);
+      setError(null);
+    }
+  };
+
+  // Escribir en cualquier campo limpia el aviso anterior
+  const cambiar = (alCambiar) => (e) => {
+    setError(null);
+    alCambiar(e.target.value);
   };
 
   return (
@@ -25,23 +45,32 @@ export default function PlatosCompartidos({ comensales, compartidos, onAgregar, 
           type="text"
           aria-label="Nombre del plato compartido"
           placeholder="Ej. Botella de vino, Entrada"
+          maxLength={MAX_TEXTO}
           value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
+          onChange={cambiar(setNombre)}
           className={campo}
         />
         <input
           type="number"
           min="0"
+          max={MAX_MONTO}
           aria-label="Valor total del plato compartido"
+          aria-invalid={error !== null && error.includes('valor')}
+          aria-describedby={error ? 'error-compartido' : undefined}
           placeholder="Valor total"
           value={valor}
-          onChange={(e) => setValor(e.target.value)}
+          onChange={cambiar(setValor)}
           className={campo}
         />
         <button onClick={registrar} className={boton}>
           Registrar compartido
         </button>
       </div>
+      {error && (
+        <p id="error-compartido" role="alert" className="text-sm text-red-800">
+          {error}
+        </p>
+      )}
 
       {comensales.length > 0 && (
         <fieldset className="flex flex-wrap gap-2 pt-2">
