@@ -14,11 +14,14 @@ api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
     raise SystemExit("No encontré GEMINI_API_KEY en tu .env")
 
-print(f"Usando clave que empieza por: {api_key[:6]}...")
+print(f"Clave encontrada ({len(api_key)} caracteres).")
 
 client = genai.Client(api_key=api_key)
 
-for modelo in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+# Primero el modelo configurado en GEMINI_MODEL (el que usa main.py); después
+# algunos candidatos por si Google retiró el actual.
+candidatos = [os.getenv("GEMINI_MODEL", "gemini-3.8-flash"), "gemini-3.8-flash", "gemini-2.5-flash"]
+for modelo in dict.fromkeys(candidatos):
     print(f"\n--- Probando modelo: {modelo} ---")
     try:
         response = client.models.generate_content(
