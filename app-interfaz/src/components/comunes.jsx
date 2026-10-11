@@ -1,7 +1,8 @@
 import React from 'react';
 import { campo, boton, botonPeligro } from '../estilos';
 import { MAX_PERSONAS, nuevaPersona } from '../personas';
-import { MAX_MONTO, MAX_NOMBRE } from '../validacion';
+import { MAX_NOMBRE } from '../validacion';
+import CampoMonto from './CampoMonto';
 
 // Aviso de un valor inválido; se anuncia a los lectores de pantalla.
 export function Aviso({ children }) {
@@ -37,10 +38,7 @@ export function ListaPersonas({ personas, setPersonas, etiquetaValor }) {
               className={`${campo} min-w-0 order-1 sm:order-none`}
             />
             {etiquetaValor && (
-              <input
-                type="number"
-                min="0"
-                max={MAX_MONTO}
+              <CampoMonto
                 aria-label={`${etiquetaValor} de ${p.nombre || `la persona ${i + 1}`}`}
                 placeholder={etiquetaValor}
                 value={p.valor}

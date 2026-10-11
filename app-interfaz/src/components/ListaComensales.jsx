@@ -1,8 +1,8 @@
 import React from 'react';
 import { botonPeligro, campoCompacto } from '../estilos';
+import CampoMonto from './CampoMonto';
 import {
   MAX_CANTIDAD,
-  MAX_MONTO,
   MAX_NOMBRE,
   MAX_TEXTO,
   errorDeCantidadEditada,
@@ -84,10 +84,7 @@ export default function ListaComensales({
                         className={`${campoCompacto} w-14 text-center ${conError(errorCantidad)}`}
                       />
                       <span aria-hidden="true" className="text-gray-500 text-xs">x</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max={MAX_MONTO}
+                      <CampoMonto
                         aria-label={`Precio unitario de ${item.nombre}`}
                         aria-invalid={errorPrecio !== null}
                         aria-describedby={errorCantidad || errorPrecio ? idError : undefined}

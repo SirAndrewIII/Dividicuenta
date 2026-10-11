@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { formatoPesos } from '../calculos';
 import { boton, botonPeligro, campo } from '../estilos';
-import { MAX_MONTO, MAX_TEXTO, errorDeMonto } from '../validacion';
+import { MAX_TEXTO, aMonto, errorDeMonto } from '../validacion';
+import CampoMonto from './CampoMonto';
 
 export default function PlatosCompartidos({ comensales, compartidos, onAgregar, onEliminar }) {
   const [nombre, setNombre] = useState('');
@@ -27,7 +28,7 @@ export default function PlatosCompartidos({ comensales, compartidos, onAgregar, 
           (idsVigentes.length === 0 ? 'Elige quiénes lo comparten.' : null);
     if (problema) return setError(problema);
 
-    if (onAgregar({ nombre: nombre.trim(), valorTotal: Number(valor), comensalesIds: idsVigentes })) {
+    if (onAgregar({ nombre: nombre.trim(), valorTotal: aMonto(valor), comensalesIds: idsVigentes })) {
       setNombre('');
       setValor('');
       setIds([]);
@@ -54,10 +55,7 @@ export default function PlatosCompartidos({ comensales, compartidos, onAgregar, 
           onChange={cambiar(setNombre)}
           className={campo}
         />
-        <input
-          type="number"
-          min="0"
-          max={MAX_MONTO}
+        <CampoMonto
           aria-label="Valor total del plato compartido"
           aria-invalid={error !== null && error.includes('valor')}
           aria-describedby={error ? 'error-compartido' : undefined}

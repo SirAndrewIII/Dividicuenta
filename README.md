@@ -19,11 +19,12 @@ Los límites viven en `app-interfaz/src/validacion.js`:
 - **Cantidad de un plato:** entero de 1 a 99.
 - **Propina:** de 0 a 100.
 - **Nombres:** hasta 40 caracteres (personas) y 60 (platos y motivos).
-- **Precios escritos a mano** (`1.500`, `4500,50`, `$10.000`): se aceptan hasta 2 decimales y el punto seguido de 3 dígitos cuenta como separador de miles. Lo ambiguo (`12.34.56`, `1..2`, `1,500`) se rechaza en lugar de interpretarse.
-- **Un valor fuera de rango** se conserva tal como se escribió, se marca en rojo con un mensaje que dice por qué, y los totales se ocultan hasta corregirlo. Nada se cambia en silencio.
+- **Una sola gramática de importes** para todos los campos y modos (precio de un plato, plato compartido, total, ingresos, pagos) y para la carga por lista: `1500`, `1.500`, `4500,50`, `4500.50`, `$10.000`. Hasta 2 decimales; el punto seguido de exactamente 3 dígitos es separador de miles. Lo ambiguo (`12.34.56`, `1..2`, `1,2,3`, `1,500`) se rechaza con un mensaje que enseña el formato, en lugar de interpretarse. Por eso los campos de importe son de texto y no `type="number"`: el navegador leería «1.500» como 1,5.
+- **Un valor fuera de rango** se conserva tal como se escribió, se marca en rojo con un mensaje que dice por qué, y los totales se ocultan hasta corregirlo. Nada se cambia en silencio, tampoco al recargar la página: lo guardado en el navegador solo se sanea en su estructura, nunca en sus importes.
 - **Precios de la IA:** `null`, booleanos, vacíos o negativos descartan el plato (un precio desconocido nunca aparece como gratis). El backend y el frontend aplican el mismo esquema.
-- **Platos compartidos:** solo se registran con participantes que existen. Si al eliminar a alguien un plato queda sin participantes, se marca y su importe aparece como «sin asignar» en el resumen y en el mensaje.
-- **Ingresos:** no se incluyen en el mensaje de WhatsApp salvo que se marque la opción.
+- **Platos compartidos:** solo se registran con participantes que existen. Si al eliminar a alguien un plato queda sin participantes, se marca y el resumen separa el *total repartido*, lo *sin asignar* y el *total de la factura*; mientras haya gasto sin asignar no se puede compartir la cuenta.
+- **Ingresos:** ni el ingreso de cada persona ni el porcentaje de esfuerzo (que permite despejarlo: aporte ÷ esfuerzo) se incluyen en el mensaje de WhatsApp salvo que se marque la opción.
+- **Foto de la carta:** el backend valida el contenido real del archivo por sus primeros bytes (JPG, PNG, WEBP, HEIC/HEIF), no el tipo que declara el cliente, y a Gemini le envía el tipo detectado. Otro contenido recibe un 415 sin gastar cuota de la IA.
 - **Reiniciar** borra lo cargado en todos los modos y su guardado en el navegador.
 - Lo guardado en el navegador se sanea al cargar, por si viene de una versión anterior o fue alterado.
 
@@ -69,6 +70,8 @@ python -m pytest tests                                # desde la raíz
 ```
 
 El workflow de [CI](.github/workflows/ci.yml) ejecuta todo esto en cada pull request y en cada push a `main`.
+
+`npm audit` informa 3 vulnerabilidades *moderadas* (`@capacitor/cli`, `uuid` y `xcode`), todas en la cadena de herramientas de desarrollo de Capacitor. No llegan al bundle (`npm audit --omit=dev` da 0), no hay carpetas `ios/` ni `android/` todavía y npm solo ofrece bajar `@capacitor/cli` a una versión anterior, así que se aceptan hasta que se empaquete la app nativa; entonces conviene revisarlas.
 
 Las pruebas del frontend incluyen una auditoría de accesibilidad con axe-core. El contraste no se puede medir en jsdom; se comprobó en un navegador real (WCAG 2.2 AA, escritorio y 375 px).
 

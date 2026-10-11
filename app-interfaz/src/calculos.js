@@ -1,10 +1,17 @@
-import { MAX_TEXTO, esCantidadValida, esMontoValido } from './validacion';
+import { MAX_TEXTO, aMonto, esCantidadValida, esMontoValido, montoOCero, parsearPrecio } from './validacion';
+
+// La gramática de importes vive en validacion.js; se reexporta por compatibilidad.
+export { parsearPrecio };
 
 // Funciones puras de reparto. Trabajan en centavos enteros para que la suma
 // de las partes siempre coincida exactamente con el total.
 
 // Un valor no finito (NaN, Infinity) cuenta como 0 en lugar de contagiar a todo el cálculo.
-const aCentavos = (n) => (Number.isFinite(Number(n)) ? Math.round(Number(n) * 100) : 0);
+// Acepta números o texto de importe (se interpreta con la misma gramática que los campos).
+const aCentavos = (n) => {
+  const v = aMonto(n);
+  return Number.isFinite(v) ? Math.round(v * 100) : 0;
+};
 const aPesos = (c) => c / 100;
 
 // Reparte `totalC` centavos según `pesos` (método del mayor resto).
@@ -39,7 +46,7 @@ export function calcularCuentaPorConsumo(comensales, compartidos, propinaPct) {
 
   const individual = comensales.map((c) =>
     c.items.reduce(
-      (acc, it) => acc + aCentavos((Number(it.cantidad) || 0) * (Number(it.valorUnitario) || 0)),
+      (acc, it) => acc + aCentavos((Number(it.cantidad) || 0) * montoOCero(it.valorUnitario)),
       0,
     ),
   );
@@ -233,20 +240,6 @@ export const formatoPesos = (n) => {
     })
   );
 };
-
-// "30.000", "$30000", "1.500,50" -> número (formato es-AR). NaN si no es un precio.
-// Formatos válidos (es-AR), con hasta 2 decimales:
-//   4500   4500,50   4500.50   1.500   10.000   1.234.567,89
-// Todo lo demás es ambiguo y se rechaza (NaN): 12.34.56, 1..2, 1,2,3, 1,500…
-const PRECIO_CON_MILES = /^[1-9]\d{0,2}(\.\d{3})+(,\d{1,2})?$/;
-const PRECIO_SIMPLE = /^\d+([,.]\d{1,2})?$/;
-
-export function parsearPrecio(texto) {
-  const limpio = String(texto).replace(/[$\s]/g, '');
-  if (PRECIO_CON_MILES.test(limpio)) return parseFloat(limpio.replace(/\./g, '').replace(',', '.'));
-  if (PRECIO_SIMPLE.test(limpio)) return parseFloat(limpio.replace(',', '.'));
-  return NaN;
-}
 
 // Una línea por plato: "[cantidad] nombre precio-unitario".
 // Ej.: "2 hamburguesa 30000", "papas fritas $10.000", "3x cerveza 4500".

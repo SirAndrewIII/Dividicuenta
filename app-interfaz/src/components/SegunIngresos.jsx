@@ -4,7 +4,8 @@ import { campo } from '../estilos';
 import { useEstadoPersistente } from '../hooks/useEstadoPersistente';
 import { abrirWhatsApp, mensajeIngresos } from '../mensajes';
 import { num, personasIniciales, sanearPersonas } from '../personas';
-import { MAX_MONTO, MAX_TEXTO, errorDeMonto } from '../validacion';
+import { MAX_TEXTO, errorDeMonto } from '../validacion';
+import CampoMonto from './CampoMonto';
 import { Aviso, Campo, Fila, ListaPersonas, Resultado } from './comunes';
 
 export default function SegunIngresos() {
@@ -34,7 +35,7 @@ export default function SegunIngresos() {
           <input className={`${campo} w-full`} maxLength={MAX_TEXTO} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Alquiler y expensas" />
         </Campo>
         <Campo etiqueta="Gasto total">
-          <input type="number" min="0" max={MAX_MONTO} className={`${campo} w-full`} value={total} onChange={(e) => setTotal(e.target.value)} />
+          <CampoMonto className={`${campo} w-full`} value={total} onChange={(e) => setTotal(e.target.value)} />
         </Campo>
       </div>
       <ListaPersonas personas={personas} setPersonas={setPersonas} etiquetaValor="Ingreso" />

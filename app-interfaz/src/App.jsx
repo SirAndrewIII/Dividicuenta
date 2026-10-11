@@ -49,7 +49,7 @@ export default function DividiCuentaApp() {
           <button
             ref={botonReiniciar}
             onClick={() => setConfirmandoReinicio(true)}
-            className="absolute top-4 right-4 bg-emerald-800 hover:bg-emerald-900 text-emerald-100 hover:text-white text-xs px-3 min-h-11 rounded-xl font-medium transition"
+            className="mt-3 sm:mt-0 sm:absolute sm:top-4 sm:right-4 bg-emerald-800 hover:bg-emerald-900 text-emerald-100 hover:text-white text-xs px-3 min-h-11 rounded-xl font-medium transition"
           >
             Reiniciar
           </button>

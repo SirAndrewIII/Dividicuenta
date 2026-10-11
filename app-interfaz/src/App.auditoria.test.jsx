@@ -18,7 +18,7 @@ const alertas = () => screen.queryAllByRole('alert').map((a) => a.textContent);
 
 async function registrarCompartido(user, { nombre = 'Vino', valor = '100', quienes = [] } = {}) {
   await user.type(screen.getByRole('textbox', { name: 'Nombre del plato compartido' }), nombre);
-  await user.type(screen.getByRole('spinbutton', { name: 'Valor total del plato compartido' }), valor);
+  await user.type(screen.getByRole('textbox', { name: 'Valor total del plato compartido' }), valor);
   for (const q of quienes) await user.click(screen.getByRole('checkbox', { name: q }));
   await user.click(screen.getByRole('button', { name: 'Registrar compartido' }));
 }
@@ -29,7 +29,7 @@ describe('H02: compartidos con participantes eliminados', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Ana' })); // seleccionada...
     await user.click(screen.getByRole('button', { name: 'Eliminar a Ana' })); // ...y eliminada
     await user.type(screen.getByRole('textbox', { name: 'Nombre del plato compartido' }), 'Vino');
-    await user.type(screen.getByRole('spinbutton', { name: 'Valor total del plato compartido' }), '100');
+    await user.type(screen.getByRole('textbox', { name: 'Valor total del plato compartido' }), '100');
     await user.click(screen.getByRole('button', { name: 'Registrar compartido' }));
 
     expect(alertas()).toContain('Elige quiénes lo comparten.');
@@ -42,7 +42,7 @@ describe('H02: compartidos con participantes eliminados', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Beto' }));
     await user.click(screen.getByRole('button', { name: 'Eliminar a Ana' }));
     await user.type(screen.getByRole('textbox', { name: 'Nombre del plato compartido' }), 'Vino');
-    await user.type(screen.getByRole('spinbutton', { name: 'Valor total del plato compartido' }), '100');
+    await user.type(screen.getByRole('textbox', { name: 'Valor total del plato compartido' }), '100');
     await user.click(screen.getByRole('button', { name: 'Registrar compartido' }));
 
     expect(screen.getByRole('button', { name: 'Eliminar Vino' })).toBeTruthy();
@@ -58,15 +58,34 @@ describe('H02: compartidos con participantes eliminados', () => {
     expect(alertas().some((a) => a.includes('$100 de platos compartidos sin participantes'))).toBe(true);
   });
 
-  it('el mensaje de WhatsApp advierte el gasto sin asignar', async () => {
+  it('P3: con gasto sin asignar se distingue el total de la factura y no se puede compartir', async () => {
     const abrir = vi.spyOn(window, 'open').mockImplementation(() => null);
     const { user } = await preparar(['Ana', 'Beto']);
     await registrarCompartido(user, { quienes: ['Ana'] });
     await user.click(screen.getByRole('button', { name: 'Eliminar a Ana' }));
-    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
 
-    const mensaje = decodeURIComponent(abrir.mock.calls[0][0].split('text=')[1]);
-    expect(mensaje).toContain('Sin asignar (platos compartidos sin participantes): $100');
+    // Ya no aparece «Gran total factura: $0»: se separan lo repartido, lo sin asignar y el total real
+    expect(screen.queryByText('Gran total factura:')).toBeNull();
+    expect(screen.getByText('Total repartido entre los comensales:').nextSibling.textContent).toBe('$0');
+    expect(screen.getByText('Sin asignar:').nextSibling.textContent).toBe('$100');
+    expect(screen.getByText('Total de la factura:').nextSibling.textContent).toBe('$100');
+
+    const boton = screen.getByRole('button', { name: 'Enviar por WhatsApp' });
+    expect(boton.disabled).toBe(true);
+    expect(document.getElementById(boton.getAttribute('aria-describedby')).textContent).toContain('no se puede compartir');
+    await user.click(boton);
+    expect(abrir).not.toHaveBeenCalled();
+  });
+
+  it('P3: al resolver el gasto sin asignar vuelve el total normal y se puede compartir', async () => {
+    const { user } = await preparar(['Ana', 'Beto']);
+    await registrarCompartido(user, { quienes: ['Ana'] });
+    await user.click(screen.getByRole('button', { name: 'Eliminar a Ana' }));
+    await user.click(screen.getByRole('button', { name: 'Eliminar Vino' }));
+
+    expect(screen.getByText('Gran total factura:')).toBeTruthy();
+    expect(screen.queryByText('Sin asignar:')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Enviar por WhatsApp' }).disabled).toBe(false);
   });
 });
 
@@ -99,11 +118,11 @@ describe('N01: «Sí, borrar todo» borra todos los modos', () => {
     const { user } = await preparar(['Ana']);
 
     await irA(user, /Partes iguales/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Total de la cuenta' }), '123');
+    await user.type(screen.getByRole('textbox', { name: 'Total de la cuenta' }), '123');
     await irA(user, /Según ingresos/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Ingreso de Persona 1' }), '900000');
+    await user.type(screen.getByRole('textbox', { name: 'Ingreso de Persona 1' }), '900000');
     await irA(user, /Quién pagó qué/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Pagó de Persona 1' }), '5000');
+    await user.type(screen.getByRole('textbox', { name: 'Pagó de Persona 1' }), '5000');
 
     await user.click(screen.getByRole('button', { name: 'Reiniciar' }));
     expect(screen.getByRole('alertdialog').textContent).toContain('todos los modos');
@@ -111,11 +130,11 @@ describe('N01: «Sí, borrar todo» borra todos los modos', () => {
 
     expect(screen.queryByRole('textbox', { name: 'Nombre del comensal 1' })).toBeNull();
     await irA(user, /Partes iguales/);
-    expect(screen.getByRole('spinbutton', { name: 'Total de la cuenta' }).value).toBe('');
+    expect(screen.getByRole('textbox', { name: 'Total de la cuenta' }).value).toBe('');
     await irA(user, /Según ingresos/);
-    expect(screen.getByRole('spinbutton', { name: 'Ingreso de Persona 1' }).value).toBe('');
+    expect(screen.getByRole('textbox', { name: 'Ingreso de Persona 1' }).value).toBe('');
     await irA(user, /Quién pagó qué/);
-    expect(screen.getByRole('spinbutton', { name: 'Pagó de Persona 1' }).value).toBe('');
+    expect(screen.getByRole('textbox', { name: 'Pagó de Persona 1' }).value).toBe('');
 
     // Los modos vuelven a guardar su estado inicial (vacío), no lo cargado antes
     expect(window.localStorage.getItem('dividicuenta:v1:iguales:total')).toBe('""');
@@ -127,7 +146,7 @@ describe('N01: «Sí, borrar todo» borra todos los modos', () => {
     const user = userEvent.setup();
     render(<App />);
     await irA(user, /Partes iguales/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Total de la cuenta' }), '500');
+    await user.type(screen.getByRole('textbox', { name: 'Total de la cuenta' }), '500');
     expect(screen.getByRole('button', { name: 'Reiniciar' })).toBeTruthy();
   });
 });
@@ -135,9 +154,9 @@ describe('N01: «Sí, borrar todo» borra todos los modos', () => {
 describe('H16: ingresos en el mensaje', () => {
   const armar = async (user) => {
     await irA(user, /Según ingresos/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Gasto total' }), '300000');
-    await user.type(screen.getByRole('spinbutton', { name: 'Ingreso de Persona 1' }), '900000');
-    await user.type(screen.getByRole('spinbutton', { name: 'Ingreso de Persona 2' }), '300000');
+    await user.type(screen.getByRole('textbox', { name: 'Gasto total' }), '300000');
+    await user.type(screen.getByRole('textbox', { name: 'Ingreso de Persona 1' }), '900000');
+    await user.type(screen.getByRole('textbox', { name: 'Ingreso de Persona 2' }), '300000');
   };
   const mensaje = (abrir) => decodeURIComponent(abrir.mock.calls[0][0].split('text=')[1]);
 
