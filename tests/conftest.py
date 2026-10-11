@@ -19,8 +19,10 @@ from fastapi.testclient import TestClient  # noqa: E402
 @pytest.fixture(autouse=True)
 def limpiar_limite():
     main._peticiones.clear()
+    main._peticiones_globales.clear()
     yield
     main._peticiones.clear()
+    main._peticiones_globales.clear()
 
 
 @pytest.fixture
@@ -47,5 +49,17 @@ class Respuesta:
         self.text = text
 
 
-MENU_OK = '{"status":"success","menu":{"categorias":[{"nombre_categoria":"A","items":[]}]}}'
+MENU_OK = (
+    '{"status":"success","menu":{"categorias":[{"nombre_categoria":"A",'
+    '"items":[{"nombre":"Flan","descripcion":"Con dulce de leche","precio":3000}]}]}}'
+)
+
+
+def menu_con_items(*items):
+    """Menú de una categoría con los ítems dados (cada uno es un dict ya serializable)."""
+    import json
+
+    return json.dumps(
+        {"status": "success", "menu": {"categorias": [{"nombre_categoria": "A", "items": list(items)}]}}
+    )
 IMAGEN = ("carta.png", b"\x89PNG0000", "image/png")

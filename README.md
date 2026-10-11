@@ -7,7 +7,7 @@ Divide la cuenta entre amigos de cuatro formas:
 | **Por consumo** | Cada uno carga lo que pidió (uno a uno o pegando una lista), con platos compartidos y propina. Se puede escanear la carta con IA. |
 | **Partes iguales** | Un total entre N personas, con propina opcional. |
 | **Según ingresos** | Cada uno aporta el mismo porcentaje de lo que gana. |
-| **Quién pagó qué** | Calcula las transferencias mínimas para quedar a mano. |
+| **Quién pagó qué** | Calcula la menor cantidad posible de transferencias para quedar a mano (óptimo exacto hasta 16 personas con saldo). |
 
 Todos los modos pueden compartir el resultado por WhatsApp. Lo que cargas se guarda en el navegador (`localStorage`), así que sobrevive a recargas; no hay base de datos ni cuentas de usuario.
 
@@ -19,7 +19,12 @@ Los límites viven en `app-interfaz/src/validacion.js`:
 - **Cantidad de un plato:** entero de 1 a 99.
 - **Propina:** de 0 a 100.
 - **Nombres:** hasta 40 caracteres (personas) y 60 (platos y motivos).
-- Un valor fuera de rango se rechaza con un mensaje que dice por qué; al editar un plato ya cargado simplemente no se acepta la tecla.
+- **Precios escritos a mano** (`1.500`, `4500,50`, `$10.000`): se aceptan hasta 2 decimales y el punto seguido de 3 dígitos cuenta como separador de miles. Lo ambiguo (`12.34.56`, `1..2`, `1,500`) se rechaza en lugar de interpretarse.
+- **Un valor fuera de rango** se conserva tal como se escribió, se marca en rojo con un mensaje que dice por qué, y los totales se ocultan hasta corregirlo. Nada se cambia en silencio.
+- **Precios de la IA:** `null`, booleanos, vacíos o negativos descartan el plato (un precio desconocido nunca aparece como gratis). El backend y el frontend aplican el mismo esquema.
+- **Platos compartidos:** solo se registran con participantes que existen. Si al eliminar a alguien un plato queda sin participantes, se marca y su importe aparece como «sin asignar» en el resumen y en el mensaje.
+- **Ingresos:** no se incluyen en el mensaje de WhatsApp salvo que se marque la opción.
+- **Reiniciar** borra lo cargado en todos los modos y su guardado en el navegador.
 - Lo guardado en el navegador se sanea al cargar, por si viene de una versión anterior o fue alterado.
 
 ## Estructura
@@ -72,9 +77,11 @@ Las pruebas del frontend incluyen una auditoría de accesibilidad con axe-core. 
 Variables de entorno del **backend** (ver [.env.example](.env.example)):
 
 - `GEMINI_API_KEY`: obligatoria.
+- `GEMINI_MODEL` (por defecto `gemini-3.8-flash`): Google retira modelos con el tiempo. Si el escaneo responde 502 y el log de Render muestra `404 NOT_FOUND ... is no longer available`, basta con cambiar esta variable y reiniciar el servicio, sin tocar código. `python test_gemini.py` prueba la clave y los modelos.
 - `ALLOWED_ORIGINS`: dominio(s) del frontend separados por coma. **Sin esto, el escaneo de cartas falla por CORS** al estar el frontend en otro dominio.
-- `TRUST_PROXY=1`: si el backend está detrás de un proxy (Render, Railway...), para que el límite de peticiones use la IP real.
-- `MAX_UPLOAD_MB` (5) y `RATE_LIMIT_MAX` (10 por minuto y por IP): opcionales.
+- `TRUST_PROXY=1`: si el backend está detrás de un proxy (Render, Railway...), para que el límite de peticiones use la IP real. Se toma la entrada de `X-Forwarded-For` que **agrega el proxy** (la última), nunca la primera, que puede escribirla el cliente.
+- `TRUSTED_PROXY_HOPS` (1): cuántos proxies de confianza hay delante. Usa 2 si además hay un CDN delante.
+- `MAX_UPLOAD_MB` (5), `RATE_LIMIT_MAX` (10 por minuto y por IP) y `GLOBAL_RATE_LIMIT_MAX` (100 por minuto en total): opcionales.
 
 Variable del **frontend** (se fija al compilar): `VITE_API_URL`, la URL pública del backend.
 

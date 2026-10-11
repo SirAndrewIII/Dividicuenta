@@ -46,11 +46,16 @@ export function calcularCuentaPorConsumo(comensales, compartidos, propinaPct) {
 
   const compartido = comensales.map(() => 0);
   const detalle = comensales.map(() => []);
+  // Gasto de platos compartidos que no se le cobra a nadie (sin participantes)
+  let sinAsignar = 0;
   compartidos.forEach((plato, k) => {
     const participantes = plato.comensalesIds.filter((id) => posicion.has(id));
     const n = participantes.length;
-    if (n === 0) return;
     const totalC = aCentavos(plato.valorTotal);
+    if (n === 0) {
+      sinAsignar += totalC;
+      return;
+    }
     const base = Math.floor(totalC / n);
     const extra = totalC - base * n;
     participantes.forEach((id, j) => {
@@ -86,11 +91,21 @@ export function calcularCuentaPorConsumo(comensales, compartidos, propinaPct) {
     totalSubtotal: aPesos(totalSubtotal),
     totalPropina: aPesos(propinaAsignada),
     total: aPesos(totalSubtotal + propinaAsignada),
+    sinAsignar: aPesos(sinAsignar),
   };
 }
 
 // Valida y limpia el menú que devuelve la IA: descarta lo que no tenga la
 // forma esperada. Devuelve null si no queda ningún plato utilizable.
+// Un precio solo es válido si llega como número o como texto numérico («8500»,
+// «8500.5»). `null`, `true`, `''` o `[]` no son precios: Number(null) valdría 0
+// y un plato de precio desconocido aparecería como gratis.
+export function precioDeLaIA(valor) {
+  if (typeof valor === 'number') return valor;
+  if (typeof valor === 'string' && /^\d+(\.\d{1,2})?$/.test(valor.trim())) return Number(valor.trim());
+  return NaN;
+}
+
 export function normalizarMenu(menu) {
   if (!menu || !Array.isArray(menu.categorias)) return null;
   const categorias = menu.categorias
@@ -98,11 +113,11 @@ export function normalizarMenu(menu) {
       nombre_categoria: String((cat && cat.nombre_categoria) || 'Otros'),
       items: (Array.isArray(cat && cat.items) ? cat.items : [])
         .map((it) => ({
-          nombre: String((it && it.nombre) || '').trim(),
-          descripcion: it && it.descripcion ? String(it.descripcion) : '',
-          precio: Number(it && it.precio),
+          nombre: typeof (it && it.nombre) === 'string' ? it.nombre.trim() : '',
+          descripcion: it && typeof it.descripcion === 'string' ? it.descripcion : '',
+          precio: precioDeLaIA(it && it.precio),
         }))
-        .filter((it) => it.nombre && Number.isFinite(it.precio) && it.precio >= 0),
+        .filter((it) => it.nombre && esMontoValido(it.precio)),
     }))
     .filter((cat) => cat.items.length > 0);
   return categorias.length > 0 ? { categorias } : null;
@@ -123,16 +138,58 @@ export function dividirPorIngresos(total, ingresos) {
   };
 }
 
-// Dado cuánto pagó cada uno y cuánto le corresponde, calcula las transferencias
-// mínimas (deudor mayor -> acreedor mayor) para dejar todo en cero.
-export function saldarDeudas(personas) {
-  const deudores = [];
-  const acreedores = [];
-  personas.forEach(({ nombre, pagado, corresponde }) => {
-    const saldo = aCentavos(pagado) - aCentavos(corresponde);
-    if (saldo < 0) deudores.push({ nombre, c: -saldo });
-    else if (saldo > 0) acreedores.push({ nombre, c: saldo });
-  });
+// Hasta este número de personas con saldo se calcula el óptimo exacto (2^16 subconjuntos).
+const MAX_PERSONAS_EXACTO = 16;
+
+// Parte a las personas con saldo en el máximo de grupos disjuntos que suman
+// cero. Cada grupo se salda por dentro con (tamaño - 1) transferencias, así que
+// la cantidad total es n menos el número de grupos: maximizar grupos = minimizar
+// transferencias.
+function gruposDeSumaCero(saldos) {
+  const n = saldos.length;
+  if (n > MAX_PERSONAS_EXACTO) return [saldos];
+
+  const total = 1 << n;
+  const suma = new Float64Array(total);
+  const mejor = new Int8Array(total);
+  const padre = new Int8Array(total);
+  for (let m = 1; m < total; m++) {
+    const bajo = 31 - Math.clz32(m & -m);
+    suma[m] = suma[m & (m - 1)] + saldos[bajo].c;
+    let top = -1;
+    for (let i = 0; i < n; i++) {
+      if (m & (1 << i) && mejor[m ^ (1 << i)] > top) {
+        top = mejor[m ^ (1 << i)];
+        padre[m] = i;
+      }
+    }
+    mejor[m] = top + (suma[m] === 0 ? 1 : 0);
+  }
+
+  // Reconstruye un orden de inclusión y corta donde la suma acumulada vuelve a cero
+  const orden = [];
+  for (let m = total - 1; m; m ^= 1 << padre[m]) orden.push(padre[m]);
+  orden.reverse();
+
+  const grupos = [];
+  let actual = [];
+  let acumulado = 0;
+  for (const i of orden) {
+    actual.push(saldos[i]);
+    acumulado += saldos[i].c;
+    if (acumulado === 0) {
+      grupos.push(actual);
+      actual = [];
+    }
+  }
+  if (actual.length > 0) grupos.push(actual); // saldos que no cierran (entradas inconsistentes)
+  return grupos;
+}
+
+// Salda un grupo cruzando el mayor deudor con el mayor acreedor.
+function saldarGrupo(grupo) {
+  const deudores = grupo.filter((p) => p.c < 0).map((p) => ({ nombre: p.nombre, c: -p.c }));
+  const acreedores = grupo.filter((p) => p.c > 0).map((p) => ({ nombre: p.nombre, c: p.c }));
   deudores.sort((a, b) => b.c - a.c);
   acreedores.sort((a, b) => b.c - a.c);
 
@@ -150,6 +207,20 @@ export function saldarDeudas(personas) {
   return transferencias;
 }
 
+// Dado cuánto pagó cada uno y cuánto le corresponde, calcula la menor cantidad
+// de transferencias que deja todo en cero (óptimo exacto hasta 16 personas con
+// saldo; más allá, cruza mayor deudor con mayor acreedor).
+export function saldarDeudas(personas) {
+  const saldos = personas
+    .map(({ nombre, pagado, corresponde }) => ({ nombre, c: aCentavos(pagado) - aCentavos(corresponde) }))
+    .filter((p) => p.c !== 0);
+  // Orden estable: de mayor a menor monto y, a igualdad, según el orden de la lista
+  const posicion = (nombre) => personas.findIndex((p) => p.nombre === nombre);
+  return gruposDeSumaCero(saldos)
+    .flatMap(saldarGrupo)
+    .sort((x, y) => y.monto - x.monto || posicion(x.de) - posicion(y.de) || posicion(x.a) - posicion(y.a));
+}
+
 // Formato es-AR: sin decimales si es entero y con 2 si hay centavos ($33,34).
 export const formatoPesos = (n) => {
   const centavos = Math.round((Number(n) || 0) * 100);
@@ -164,11 +235,17 @@ export const formatoPesos = (n) => {
 };
 
 // "30.000", "$30000", "1.500,50" -> número (formato es-AR). NaN si no es un precio.
+// Formatos válidos (es-AR), con hasta 2 decimales:
+//   4500   4500,50   4500.50   1.500   10.000   1.234.567,89
+// Todo lo demás es ambiguo y se rechaza (NaN): 12.34.56, 1..2, 1,2,3, 1,500…
+const PRECIO_CON_MILES = /^[1-9]\d{0,2}(\.\d{3})+(,\d{1,2})?$/;
+const PRECIO_SIMPLE = /^\d+([,.]\d{1,2})?$/;
+
 export function parsearPrecio(texto) {
-  const limpio = texto.replace(/[$\s]/g, '');
-  if (!/^\d[\d.,]*$/.test(limpio)) return NaN;
-  const conMiles = /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(limpio);
-  return parseFloat(conMiles ? limpio.replace(/\./g, '').replace(',', '.') : limpio.replace(',', '.'));
+  const limpio = String(texto).replace(/[$\s]/g, '');
+  if (PRECIO_CON_MILES.test(limpio)) return parseFloat(limpio.replace(/\./g, '').replace(',', '.'));
+  if (PRECIO_SIMPLE.test(limpio)) return parseFloat(limpio.replace(',', '.'));
+  return NaN;
 }
 
 // Una línea por plato: "[cantidad] nombre precio-unitario".

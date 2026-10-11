@@ -4,6 +4,9 @@ import {
   MAX_NOMBRE,
   MAX_TEXTO,
   PROPINA_INICIAL,
+  errorDeCantidadEditada,
+  errorDeMonto,
+  errorDePropina,
   esCantidadValida,
   esMontoValido,
   sanearComensales,
@@ -66,18 +69,12 @@ export function useCuentaPorConsumo() {
       cambiarComensal(comensales, comensalId, (c) => ({ ...c, items: c.items.filter((i) => i.id !== itemId) })),
     );
 
-  // Edición de un plato. Un valor fuera de los límites se ignora (el campo
-  // conserva el anterior); el campo vacío se admite mientras se escribe y se
-  // corrige en confirmarItem al salir del campo.
+  // Edición de un plato. Se conserva lo que escribe el usuario, incluso si está
+  // fuera de los límites: el error se muestra junto al campo y los totales se
+  // ocultan hasta corregirlo (ver hayErrores). El campo vacío se admite mientras
+  // se escribe y se corrige en confirmarItem al salir.
   const modificarItem = (comensalId, itemId, campo, valor) => {
-    let nuevo = valor;
-    if (campo === 'nombre') {
-      nuevo = String(valor).slice(0, MAX_TEXTO);
-    } else if (valor !== '') {
-      nuevo = Number(valor);
-      const valido = campo === 'cantidad' ? esCantidadValida(nuevo) : esMontoValido(nuevo);
-      if (!valido) return;
-    }
+    const nuevo = campo === 'nombre' ? String(valor).slice(0, MAX_TEXTO) : valor;
     setComensales(
       cambiarComensal(comensales, comensalId, (c) => ({
         ...c,
@@ -99,19 +96,18 @@ export function useCuentaPorConsumo() {
       })),
     );
 
+  // Solo registra participantes que existen; sin ninguno no hay a quién cobrarle.
   const agregarCompartido = ({ nombre, valorTotal, comensalesIds }) => {
-    if (!esMontoValido(valorTotal) || comensalesIds.length === 0) return false;
-    setCompartidos([...compartidos, { id: generarId(), nombre: nombre.slice(0, MAX_TEXTO), valorTotal, comensalesIds }]);
+    const existentes = comensalesIds.filter((id) => comensales.some((c) => c.id === id));
+    if (!esMontoValido(valorTotal) || existentes.length === 0) return false;
+    setCompartidos([...compartidos, { id: generarId(), nombre: nombre.slice(0, MAX_TEXTO), valorTotal, comensalesIds: existentes }]);
     return true;
   };
 
   const eliminarCompartido = (id) => setCompartidos(compartidos.filter((c) => c.id !== id));
 
-  const cambiarPropina = (texto) => {
-    if (texto === '') return setPropina('');
-    const n = parseInt(texto, 10);
-    if (n >= 0 && n <= 100) setPropina(n);
-  };
+  // Se conserva lo escrito; si está fuera de 0 a 100 se muestra el error y se ocultan los totales.
+  const cambiarPropina = (texto) => setPropina(texto);
 
   const reiniciar = () => {
     setComensales([]);
@@ -122,6 +118,10 @@ export function useCuentaPorConsumo() {
   };
 
   const cuenta = calcularCuentaPorConsumo(comensales, compartidos, propina);
+  const errorPropina = errorDePropina(propina);
+  const hayErrores =
+    errorPropina !== null ||
+    comensales.some((c) => c.items.some((i) => errorDeCantidadEditada(i.cantidad) || errorDeMonto(i.valorUnitario, 'El precio')));
 
   return {
     comensales,
@@ -130,9 +130,11 @@ export function useCuentaPorConsumo() {
     seleccionadoId,
     // También valida lo que quedó guardado de sesiones anteriores
     menu: normalizarMenu(menuGuardado),
-    hayDatos: comensales.length > 0 || menuGuardado !== null,
     comensalesCalculados: comensales.map((c, i) => ({ ...c, ...cuenta.porComensal[i] })),
     granTotal: cuenta.total,
+    sinAsignar: cuenta.sinAsignar,
+    errorPropina,
+    hayErrores,
     setSeleccionadoId,
     setMenu,
     agregarComensal,

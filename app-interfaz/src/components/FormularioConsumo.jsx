@@ -44,8 +44,9 @@ export default function FormularioConsumo({
     alCambiar(e.target.value);
   };
 
+  // Las líneas rechazadas se conservan en el cuadro para poder corregirlas
   const agregarLote = () => {
-    if (onAgregarItems(lote.items)) setTextoLote('');
+    if (onAgregarItems(lote.items)) setTextoLote(lote.invalidas.join('\n'));
   };
 
   const selector = (

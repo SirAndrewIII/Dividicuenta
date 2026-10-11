@@ -7,7 +7,10 @@ from google import genai
 from google.genai import types
 import os
 import json
+import math
+import re
 import time
+import asyncio
 import logging
 from collections import defaultdict, deque
 
@@ -38,36 +41,126 @@ app.add_middleware(
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "5")) * 1024 * 1024
 RATE_LIMIT_MAX = int(os.getenv("RATE_LIMIT_MAX", "10"))  # peticiones por ventana
 RATE_LIMIT_WINDOW = 60  # segundos
-# Detrás de un proxy (Render, Railway, etc.) activar TRUST_PROXY=1 para tomar
-# la IP real del primer valor de X-Forwarded-For.
+# Tope global (todas las IP juntas): protege la cuota de Gemini aunque alguien
+# consiga rotar de IP.
+GLOBAL_RATE_LIMIT_MAX = int(os.getenv("GLOBAL_RATE_LIMIT_MAX", "100"))
+# Detrás de un proxy (Render, Railway, etc.) activar TRUST_PROXY=1. El proxy
+# agrega al FINAL de X-Forwarded-For la IP que él vio; lo que viene antes lo
+# puede escribir el cliente. TRUSTED_PROXY_HOPS es cuántos proxies de confianza
+# hay delante (1 en Render; 2 si además hay un CDN delante).
 TRUST_PROXY = os.getenv("TRUST_PROXY") == "1"
+TRUSTED_PROXY_HOPS = max(1, int(os.getenv("TRUSTED_PROXY_HOPS", "1")))
 
 _peticiones = defaultdict(deque)
+_peticiones_globales = deque()
+_MAX_IPS_EN_MEMORIA = 10_000
 
 
 def _ip_cliente(request: Request) -> str:
     if TRUST_PROXY:
         reenviada = request.headers.get("x-forwarded-for")
         if reenviada:
-            return reenviada.split(",")[0].strip()
+            partes = [p.strip() for p in reenviada.split(",") if p.strip()]
+            if partes:
+                return partes[max(0, len(partes) - TRUSTED_PROXY_HOPS)]
     return request.client.host if request.client else "desconocida"
 
 
+def _olvidar_ips_inactivas(ahora: float):
+    """Evita que el diccionario crezca sin límite con IP que ya no consultan."""
+    if len(_peticiones) <= _MAX_IPS_EN_MEMORIA:
+        return
+    for ip in [ip for ip, cola in _peticiones.items() if not cola or ahora - cola[-1] > RATE_LIMIT_WINDOW]:
+        del _peticiones[ip]
+
+
 def _limitar_ritmo(request: Request):
-    """Límite en memoria por IP; protege la cuota de Gemini de abusos simples."""
+    """Límite en memoria por IP y global; protege la cuota de Gemini de abusos simples."""
     ahora = time.monotonic()
+    _olvidar_ips_inactivas(ahora)
     cola = _peticiones[_ip_cliente(request)]
     while cola and ahora - cola[0] > RATE_LIMIT_WINDOW:
         cola.popleft()
-    if len(cola) >= RATE_LIMIT_MAX:
+    while _peticiones_globales and ahora - _peticiones_globales[0] > RATE_LIMIT_WINDOW:
+        _peticiones_globales.popleft()
+    if len(cola) >= RATE_LIMIT_MAX or len(_peticiones_globales) >= GLOBAL_RATE_LIMIT_MAX:
         raise HTTPException(
             status_code=429,
             detail="Demasiadas solicitudes. Espera un minuto e intenta de nuevo.",
         )
     cola.append(ahora)
+    _peticiones_globales.append(ahora)
+
+
+_PRECIO_EN_TEXTO = re.compile(r"^\d+(\.\d{1,2})?$")
+
+
+def _precio_de(valor):
+    """Devuelve el precio como número, o None si no es un precio válido.
+
+    Es válido un número finito de 0 a 1.000.000.000 (no booleano, no nulo) o un
+    texto numérico simple como "3000" o "3000.5".
+    """
+    if isinstance(valor, str) and _PRECIO_EN_TEXTO.match(valor.strip()):
+        valor = float(valor.strip())
+        valor = int(valor) if valor.is_integer() else valor
+    if (
+        isinstance(valor, (int, float))
+        and not isinstance(valor, bool)
+        and math.isfinite(valor)
+        and 0 <= valor <= 1_000_000_000
+    ):
+        return valor
+    return None
+
+
+def _limpiar_menu(datos):
+    """Valida con esquema estricto lo que devolvió la IA y descarta lo inválido.
+
+    Devuelve el menú limpio, o None si no queda ningún plato utilizable.
+    """
+    if not isinstance(datos, dict) or datos.get("status") != "success":
+        return None
+    menu = datos.get("menu")
+    categorias = menu.get("categorias") if isinstance(menu, dict) else None
+    if not isinstance(categorias, list):
+        return None
+
+    limpias = []
+    for cat in categorias:
+        if not isinstance(cat, dict) or not isinstance(cat.get("items"), list):
+            continue
+        items = []
+        for item in cat["items"]:
+            if not isinstance(item, dict):
+                continue
+            nombre = item.get("nombre")
+            precio = _precio_de(item.get("precio"))
+            if not isinstance(nombre, str) or not nombre.strip() or precio is None:
+                continue
+            descripcion = item.get("descripcion")
+            items.append({
+                "nombre": nombre.strip(),
+                "descripcion": descripcion if isinstance(descripcion, str) else "",
+                "precio": precio,
+            })
+        if items:
+            nombre_cat = cat.get("nombre_categoria")
+            limpias.append({
+                "nombre_categoria": nombre_cat if isinstance(nombre_cat, str) and nombre_cat.strip() else "Otros",
+                "items": items,
+            })
+    if not limpias:
+        return None
+    return {"status": "success", "menu": {"categorias": limpias}}
 
 # Cliente nativo de Gemini
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Google retira modelos con el tiempo (gemini-2.5-flash ya no está disponible
+# para cuentas nuevas y responde 404). Se puede cambiar con GEMINI_MODEL sin
+# volver a desplegar código.
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 PROMPT = """
 Analiza este menú de restaurante. Extrae todos los platos, bebidas, entradas y postres organizados por sus respectivas categorías.
@@ -113,8 +206,11 @@ async def parse_menu(request: Request, file: UploadFile = File(...)):
                 detail=f"La imagen es demasiado grande (máximo {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).",
             )
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
+        # La llamada es síncrona y puede tardar segundos: se ejecuta en un hilo
+        # para no bloquear al resto de las peticiones del worker.
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(data=contents, mime_type=mime_type),
                 PROMPT,
@@ -133,17 +229,14 @@ async def parse_menu(request: Request, file: UploadFile = File(...)):
                 detail="No pudimos interpretar la carta. Prueba con otra foto.",
             )
 
-        if (
-            not isinstance(datos_menu, dict)
-            or datos_menu.get("status") != "success"
-            or not isinstance(datos_menu.get("menu", {}).get("categorias"), list)
-        ):
-            logger.error("Gemini devolvió un JSON con forma inesperada")
+        menu_limpio = _limpiar_menu(datos_menu)
+        if menu_limpio is None:
+            logger.error("Gemini devolvió un JSON con forma inesperada o sin platos válidos")
             raise HTTPException(
                 status_code=502,
                 detail="No pudimos interpretar la carta. Prueba con otra foto.",
             )
-        return datos_menu
+        return menu_limpio
 
     except HTTPException:
         raise

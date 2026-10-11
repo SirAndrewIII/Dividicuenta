@@ -25,6 +25,19 @@ export function errorDeMonto(texto, sujeto) {
   return null;
 }
 
+// Propina: vacío cuenta como 0; si no, debe estar entre 0 y 100.
+export function errorDePropina(valor) {
+  if (valor === '' || valor === null || valor === undefined) return null;
+  const n = Number(valor);
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? null : 'La propina debe estar entre 0 y 100.';
+}
+
+// Cantidad de un plato ya cargado: vacío no es error mientras se escribe
+// (al salir del campo vuelve a 1).
+export function errorDeCantidadEditada(valor) {
+  return valor === '' ? null : errorDeCantidad(valor);
+}
+
 export function errorDeCantidad(valor) {
   return esCantidadValida(Number(valor))
     ? null

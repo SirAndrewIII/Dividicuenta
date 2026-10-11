@@ -81,39 +81,80 @@ describe('edición de un plato ya cargado', () => {
     await plato(ctx.user, 'Milanesa', '8500')();
     return ctx;
   };
+  const hayTotales = () => !!screen.queryByRole('button', { name: 'Enviar por WhatsApp' });
+  const bloqueado = () => screen.getByText(/Hay valores fuera de rango/);
 
-  it('la cantidad vacía vuelve a 1 al salir del campo y no admite 0', async () => {
+  it('una cantidad inválida se conserva, se marca y oculta los totales hasta corregirla (N02)', async () => {
     const { user } = await cargarPlato();
     const cantidad = screen.getByRole('spinbutton', { name: 'Cantidad de Milanesa' });
+    expect(hayTotales()).toBe(true);
 
     await user.clear(cantidad);
     await user.type(cantidad, '0');
-    expect(cantidad.value).toBe('');
+    expect(cantidad.value).toBe('0'); // lo escrito se mantiene
+    expect(cantidad.getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getAllByRole('alert').some((a) => a.textContent === 'La cantidad debe ser un número entero entre 1 y 99.')).toBe(true);
+    expect(bloqueado()).toBeTruthy();
+    expect(hayTotales()).toBe(false);
+
+    await user.clear(cantidad);
+    await user.type(cantidad, '3');
+    expect(cantidad.getAttribute('aria-invalid')).toBe('false');
+    expect(hayTotales()).toBe(true);
+  });
+
+  it('la cantidad vacía vuelve a 1 al salir del campo', async () => {
+    const { user } = await cargarPlato();
+    const cantidad = screen.getByRole('spinbutton', { name: 'Cantidad de Milanesa' });
+    await user.clear(cantidad);
     await user.tab();
     expect(cantidad.value).toBe('1');
   });
 
-  it('la cantidad no pasa de 99 y no admite decimales', async () => {
+  it('150 de cantidad no se transforma en 15: se conserva y se marca (N02)', async () => {
     const { user } = await cargarPlato();
     const cantidad = screen.getByRole('spinbutton', { name: 'Cantidad de Milanesa' });
 
     await user.clear(cantidad);
     await user.type(cantidad, '150');
-    expect(cantidad.value).toBe('15'); // el tercer dígito pasaría de 99
-    await user.type(cantidad, '.5');
-    expect(Number.isInteger(Number(cantidad.value))).toBe(true);
+    expect(cantidad.value).toBe('150');
+    expect(hayTotales()).toBe(false);
+
+    await user.clear(cantidad);
+    await user.type(cantidad, '1.5');
+    expect(cantidad.value).toBe('1.5');
+    expect(hayTotales()).toBe(false);
   });
 
-  it('el precio no admite negativos y el vacío vuelve a 0', async () => {
+  it('un precio negativo se conserva y se marca; el vacío vuelve a 0', async () => {
     const { user } = await cargarPlato();
     const precio = screen.getByRole('spinbutton', { name: 'Precio unitario de Milanesa' });
 
     await user.clear(precio);
     await user.type(precio, '-3');
-    expect(Number(precio.value || 0)).toBeGreaterThanOrEqual(0);
+    expect(precio.value).toBe('-3');
+    expect(screen.getAllByRole('alert').some((a) => a.textContent === 'El precio no puede ser negativo.')).toBe(true);
+    expect(hayTotales()).toBe(false);
+
     await user.clear(precio);
     await user.tab();
     expect(precio.value).toBe('0');
+    expect(hayTotales()).toBe(true);
+  });
+
+  it('la propina fuera de 0 a 100 se conserva, se marca y oculta los totales', async () => {
+    const { user } = await cargarPlato();
+    const propina = screen.getByRole('spinbutton', { name: 'Porcentaje de propina (%)' });
+
+    await user.clear(propina);
+    await user.type(propina, '150');
+    expect(propina.value).toBe('150');
+    expect(screen.getAllByRole('alert').some((a) => a.textContent === 'La propina debe estar entre 0 y 100.')).toBe(true);
+    expect(hayTotales()).toBe(false);
+
+    await user.clear(propina);
+    await user.type(propina, '15');
+    expect(hayTotales()).toBe(true);
   });
 
   it('los nombres tienen largo máximo', async () => {
@@ -168,14 +209,21 @@ describe('modos simples', () => {
     expect(screen.queryAllByRole('button', { name: 'Enviar por WhatsApp' }).filter((b) => !b.closest('[hidden]'))).toHaveLength(0);
   });
 
-  it('Partes iguales: la propina fuera de 0 a 100 se ignora', async () => {
+  it('Partes iguales: la propina fuera de 0 a 100 se conserva, se marca y no calcula', async () => {
     const { user } = await preparar();
     await irA(user, /Partes iguales/);
+    await user.type(screen.getByRole('spinbutton', { name: 'Total de la cuenta' }), '1000');
     const propina = screen.getByRole('spinbutton', { name: 'Propina (%)' });
 
     await user.clear(propina);
     await user.type(propina, '150');
-    expect(propina.value).toBe('15');
+    expect(propina.value).toBe('150');
+    expect(alerta()).toBe('La propina debe estar entre 0 y 100.');
+    expect(screen.queryAllByRole('button', { name: 'Enviar por WhatsApp' }).filter((b) => !b.closest('[hidden]'))).toHaveLength(0);
+
+    await user.clear(propina);
+    await user.type(propina, '10');
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('Según ingresos: un ingreso negativo muestra a quién corresponde', async () => {

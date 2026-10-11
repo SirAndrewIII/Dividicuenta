@@ -1,16 +1,5 @@
 import React from 'react';
-
-const PREFIJO_GUARDADO = 'dividicuenta:v1:';
-
-function borrarDatosGuardados() {
-  try {
-    Object.keys(window.localStorage)
-      .filter((clave) => clave.startsWith(PREFIJO_GUARDADO))
-      .forEach((clave) => window.localStorage.removeItem(clave));
-  } catch {
-    // sin acceso al almacenamiento: no hay nada que borrar
-  }
-}
+import { borrarDatosGuardados } from './almacenamiento';
 
 // Evita la pantalla en blanco si algo falla al dibujar la app. Como la cuenta
 // se guarda en el navegador, ofrece también empezar de cero por si un dato
