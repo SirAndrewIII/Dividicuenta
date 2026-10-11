@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 import main
-from conftest import IMAGEN, MENU_OK, Respuesta, menu_con_items
+from conftest import HEIC, HEIF, IMAGEN, JPEG, MENU_OK, PNG, WEBP, Respuesta, menu_con_items
 
 
 def subir(cliente, archivo=IMAGEN, **cabeceras):
@@ -26,6 +26,51 @@ def test_menu_valido(cliente, gemini):
         "descripcion": "Con dulce de leche",
         "precio": 3000,
     }
+
+
+# --- El contenido real del archivo, no el tipo declarado ----------------------
+
+
+@pytest.mark.parametrize(
+    "nombre, contenido, declarado",
+    [
+        ("texto", b"hola, esto no es una imagen", "image/png"),
+        ("ejecutable", b"MZ\x90\x00\x03\x00\x00\x00" + b"0" * 20, "image/jpeg"),
+        ("html", b"<html><script>alert(1)</script></html>", "image/webp"),
+        ("pdf", b"%PDF-1.7\n" + b"0" * 20, "image/png"),
+        ("gif", b"GIF89a" + b"0" * 20, "image/gif"),
+        ("vacío", b"", "image/png"),
+        ("RIFF que no es WEBP", b"RIFF\x24\x00\x00\x00WAVEfmt " + b"0" * 20, "image/webp"),
+        ("ftyp de video", b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00" + b"0" * 20, "image/heic"),
+    ],
+)
+def test_un_archivo_que_no_es_imagen_se_rechaza_sin_llegar_a_gemini(cliente, gemini, nombre, contenido, declarado):
+    llamadas = []
+    gemini(lambda **kw: llamadas.append(kw) or Respuesta(MENU_OK))
+    r = subir(cliente, (f"{nombre}.png", contenido, declarado))
+    assert r.status_code == 415, nombre
+    assert "JPG, PNG, WEBP o HEIC" in r.json()["detail"]
+    assert llamadas == []  # no se gastó cuota de la IA
+
+
+@pytest.mark.parametrize(
+    "contenido, declarado, esperado",
+    [
+        (PNG, "image/png", "image/png"),
+        (JPEG, "image/jpeg", "image/jpeg"),
+        (WEBP, "image/webp", "image/webp"),
+        (HEIC, "image/heic", "image/heic"),
+        (HEIF, "image/heif", "image/heif"),
+        (JPEG, "image/png", "image/jpeg"),  # declarado mal: se usa el tipo real
+        (PNG, "image/jpg", "image/png"),
+    ],
+)
+def test_a_gemini_se_le_envia_el_tipo_real(cliente, gemini, contenido, declarado, esperado):
+    tipos = []
+    gemini(lambda **kw: tipos.append(kw["contents"][0].inline_data.mime_type) or Respuesta(MENU_OK))
+    r = subir(cliente, ("foto.bin", contenido, declarado))
+    assert r.status_code == 200
+    assert tipos == [esperado]
 
 
 # --- Esquema estricto del menú (precio nulo, booleano, texto...) -------------

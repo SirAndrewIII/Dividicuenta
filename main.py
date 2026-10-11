@@ -187,6 +187,31 @@ Asegúrate de que el campo "precio" sea un número entero (sin símbolos de mone
 """
 
 
+# Marcas de los formatos que acepta Gemini. HEIC/HEIF: bloque «ftyp» con una de estas marcas.
+_MARCAS_HEIC = {b"heic", b"heix", b"heim", b"heis", b"hevc", b"hevx", b"hevm", b"hevs"}
+_MARCAS_HEIF = {b"mif1", b"msf1"}
+
+
+def _detectar_imagen(datos: bytes):
+    """Devuelve el tipo MIME real según los primeros bytes, o None si no es una imagen soportada.
+
+    El Content-Type que declara el cliente no es confiable: texto o un ejecutable pueden
+    llegar etiquetados como image/png.
+    """
+    if datos.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if datos.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if len(datos) >= 12 and datos[:4] == b"RIFF" and datos[8:12] == b"WEBP":
+        return "image/webp"
+    if len(datos) >= 12 and datos[4:8] == b"ftyp":
+        if datos[8:12] in _MARCAS_HEIC:
+            return "image/heic"
+        if datos[8:12] in _MARCAS_HEIF:
+            return "image/heif"
+    return None
+
+
 @app.post("/api/parse-menu")
 async def parse_menu(request: Request, file: UploadFile = File(...)):
     _limitar_ritmo(request)
@@ -206,13 +231,20 @@ async def parse_menu(request: Request, file: UploadFile = File(...)):
                 detail=f"La imagen es demasiado grande (máximo {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).",
             )
 
+        tipo_real = _detectar_imagen(contents)
+        if tipo_real is None:
+            raise HTTPException(
+                status_code=415,
+                detail="Formato no soportado. Sube una foto en JPG, PNG, WEBP o HEIC.",
+            )
+
         # La llamada es síncrona y puede tardar segundos: se ejecuta en un hilo
         # para no bloquear al resto de las peticiones del worker.
         response = await asyncio.to_thread(
             client.models.generate_content,
             model=GEMINI_MODEL,
             contents=[
-                types.Part.from_bytes(data=contents, mime_type=mime_type),
+                types.Part.from_bytes(data=contents, mime_type=tipo_real),
                 PROMPT,
             ],
             config=types.GenerateContentConfig(

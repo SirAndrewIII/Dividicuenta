@@ -62,4 +62,13 @@ def menu_con_items(*items):
     return json.dumps(
         {"status": "success", "menu": {"categorias": [{"nombre_categoria": "A", "items": list(items)}]}}
     )
-IMAGEN = ("carta.png", b"\x89PNG0000", "image/png")
+
+
+# Cabeceras reales de cada formato (el backend valida el contenido, no el Content-Type declarado)
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+JPEG = b"\xff\xd8\xff\xe0" + b"0" * 32
+WEBP = b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"0" * 32
+HEIC = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00" + b"0" * 32
+HEIF = b"\x00\x00\x00\x18ftypmif1\x00\x00\x00\x00" + b"0" * 32
+
+IMAGEN = ("carta.png", PNG, "image/png")
