@@ -14,7 +14,7 @@ const preparar = async (nombres = ['Ana']) => {
 
 const plato = (user, nombre, precio) => async () => {
   const nombreCampo = screen.getByRole('textbox', { name: 'Nombre del plato' });
-  const precioCampo = screen.getByRole('spinbutton', { name: 'Precio del plato' });
+  const precioCampo = screen.getByRole('textbox', { name: 'Precio del plato' });
   if (nombre) await user.type(nombreCampo, nombre);
   if (precio !== undefined) await user.type(precioCampo, precio);
   await user.click(screen.getByRole('button', { name: 'Añadir plato' }));
@@ -128,7 +128,7 @@ describe('edición de un plato ya cargado', () => {
 
   it('un precio negativo se conserva y se marca; el vacío vuelve a 0', async () => {
     const { user } = await cargarPlato();
-    const precio = screen.getByRole('spinbutton', { name: 'Precio unitario de Milanesa' });
+    const precio = screen.getByRole('textbox', { name: 'Precio unitario de Milanesa' });
 
     await user.clear(precio);
     await user.type(precio, '-3');
@@ -169,7 +169,7 @@ describe('edición de un plato ya cargado', () => {
 describe('plato compartido', () => {
   const registrar = async (user, { nombre, valor, quienes = [] }) => {
     if (nombre) await user.type(screen.getByRole('textbox', { name: 'Nombre del plato compartido' }), nombre);
-    if (valor !== undefined) await user.type(screen.getByRole('spinbutton', { name: 'Valor total del plato compartido' }), valor);
+    if (valor !== undefined) await user.type(screen.getByRole('textbox', { name: 'Valor total del plato compartido' }), valor);
     for (const q of quienes) await user.click(screen.getByRole('checkbox', { name: q }));
     await user.click(screen.getByRole('button', { name: 'Registrar compartido' }));
   };
@@ -203,7 +203,7 @@ describe('modos simples', () => {
   it('Partes iguales: un total negativo muestra el motivo y no calcula', async () => {
     const { user } = await preparar();
     await irA(user, /Partes iguales/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Total de la cuenta' }), '-100');
+    await user.type(screen.getByRole('textbox', { name: 'Total de la cuenta' }), '-100');
 
     expect(alerta()).toBe('El total no puede ser negativo.');
     expect(screen.queryAllByRole('button', { name: 'Enviar por WhatsApp' }).filter((b) => !b.closest('[hidden]'))).toHaveLength(0);
@@ -212,7 +212,7 @@ describe('modos simples', () => {
   it('Partes iguales: la propina fuera de 0 a 100 se conserva, se marca y no calcula', async () => {
     const { user } = await preparar();
     await irA(user, /Partes iguales/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Total de la cuenta' }), '1000');
+    await user.type(screen.getByRole('textbox', { name: 'Total de la cuenta' }), '1000');
     const propina = screen.getByRole('spinbutton', { name: 'Propina (%)' });
 
     await user.clear(propina);
@@ -229,8 +229,8 @@ describe('modos simples', () => {
   it('Según ingresos: un ingreso negativo muestra a quién corresponde', async () => {
     const { user } = await preparar();
     await irA(user, /Según ingresos/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Gasto total' }), '1000');
-    await user.type(screen.getByRole('spinbutton', { name: 'Ingreso de Persona 1' }), '-50');
+    await user.type(screen.getByRole('textbox', { name: 'Gasto total' }), '1000');
+    await user.type(screen.getByRole('textbox', { name: 'Ingreso de Persona 1' }), '-50');
 
     expect(alerta()).toBe('El ingreso de Persona 1 no puede ser negativo.');
   });
@@ -238,8 +238,8 @@ describe('modos simples', () => {
   it('Quién pagó qué: un pago negativo no genera transferencias', async () => {
     const { user } = await preparar();
     await irA(user, /Quién pagó qué/);
-    await user.type(screen.getByRole('spinbutton', { name: 'Pagó de Persona 1' }), '5000');
-    await user.type(screen.getByRole('spinbutton', { name: 'Pagó de Persona 2' }), '-2000');
+    await user.type(screen.getByRole('textbox', { name: 'Pagó de Persona 1' }), '5000');
+    await user.type(screen.getByRole('textbox', { name: 'Pagó de Persona 2' }), '-2000');
 
     expect(alerta()).toBe('Lo que pagó Persona 2 no puede ser negativo.');
     expect(screen.queryByText('Persona 2 → Persona 1')).toBeNull();
@@ -248,13 +248,30 @@ describe('modos simples', () => {
 
 describe('datos guardados alterados o de versiones anteriores', () => {
   const guardar = (clave, valor) => window.localStorage.setItem(`dividicuenta:v1:${clave}`, JSON.stringify(valor));
+  const hayTotales = () => !!screen.queryByRole('button', { name: 'Enviar por WhatsApp' });
 
-  it('corrige cantidades y precios inválidos al cargar', () => {
-    guardar('comensales', [{ id: 1, nombre: 'Ana', items: [{ id: 2, nombre: 'Milanesa', cantidad: -3, valorUnitario: 'abc' }] }]);
+  it('P1: los valores fuera de rango se conservan al recargar, con su error y sin totales', () => {
+    guardar('comensales', [{ id: 1, nombre: 'Ana', items: [
+      { id: 2, nombre: 'Milanesa', cantidad: 150, valorUnitario: 8500 },
+      { id: 3, nombre: 'Lomo', cantidad: 1, valorUnitario: 2000000000 },
+    ] }]);
     render(<App />);
 
-    expect(screen.getByRole('spinbutton', { name: 'Cantidad de Milanesa' }).value).toBe('1');
-    expect(screen.getByRole('spinbutton', { name: 'Precio unitario de Milanesa' }).value).toBe('0');
+    expect(screen.getByRole('spinbutton', { name: 'Cantidad de Milanesa' }).value).toBe('150');
+    expect(screen.getByRole('textbox', { name: 'Precio unitario de Lomo' }).value).toBe('2000000000');
+    const alertas = screen.getAllByRole('alert').map((a) => a.textContent);
+    expect(alertas).toContain('La cantidad debe ser un número entero entre 1 y 99.');
+    expect(alertas).toContain('El precio es demasiado alto.');
+    expect(screen.getByText(/Hay valores fuera de rango/)).toBeTruthy();
+    expect(hayTotales()).toBe(false);
+  });
+
+  it('P1: un precio en texto inválido también se conserva y se marca', () => {
+    guardar('comensales', [{ id: 1, nombre: 'Ana', items: [{ id: 2, nombre: 'Pizza', cantidad: 1, valorUnitario: '12.34.56' }] }]);
+    render(<App />);
+    expect(screen.getByRole('textbox', { name: 'Precio unitario de Pizza' }).value).toBe('12.34.56');
+    expect(screen.getAllByRole('alert').some((a) => a.textContent.includes('El precio no es válido.'))).toBe(true);
+    expect(hayTotales()).toBe(false);
   });
 
   it('una lista corrupta no rompe la pantalla', () => {
@@ -267,14 +284,15 @@ describe('datos guardados alterados o de versiones anteriores', () => {
     expect(screen.queryByText('Algo salió mal')).toBeNull();
   });
 
-  it('la propina inválida vuelve a 10 y las personas corruptas a la lista inicial', async () => {
+  it('una propina fuera de rango se conserva y se marca; las personas corruptas vuelven a la lista inicial', async () => {
     guardar('comensales', [{ id: 1, nombre: 'Ana', items: [] }]);
     guardar('propina', -20);
     guardar('iguales:personas', 'x');
     const user = userEvent.setup();
     render(<App />);
 
-    expect(screen.getByRole('spinbutton', { name: 'Porcentaje de propina (%)' }).value).toBe('10');
+    expect(screen.getByRole('spinbutton', { name: 'Porcentaje de propina (%)' }).value).toBe('-20');
+    expect(screen.getAllByRole('alert').some((a) => a.textContent === 'La propina debe estar entre 0 y 100.')).toBe(true);
     await user.click(screen.getByRole('tab', { name: /Partes iguales/ }));
     expect(screen.getByRole('textbox', { name: 'Nombre de la persona 1' }).value).toBe('Persona 1');
     expect(screen.getByRole('textbox', { name: 'Nombre de la persona 2' }).value).toBe('Persona 2');

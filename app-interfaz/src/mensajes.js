@@ -1,4 +1,5 @@
 import { formatoPesos } from './calculos';
+import { montoOCero } from './validacion';
 
 const url = (mensaje) => `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
 
@@ -10,7 +11,7 @@ export function mensajeConsumo(comensales, propina, granTotal, sinAsignar = 0) {
   const bloques = comensales.map((c) => {
     const lineas = [`👤 *${c.nombre}*`];
     c.items.forEach((item) => {
-      const subItem = (Number(item.cantidad) || 0) * (Number(item.valorUnitario) || 0);
+      const subItem = (Number(item.cantidad) || 0) * montoOCero(item.valorUnitario);
       lineas.push(` - ${item.cantidad}x ${item.nombre} (${formatoPesos(subItem)})`);
     });
     c.detalleCompartido.forEach((comp) => {
@@ -60,8 +61,9 @@ export function mensajeIngresos({ motivo, total, personas, ingresos, montos, por
         : `${porcentajes[i].toFixed(1)}%`;
       return `• *${p.nombre}*: pone ${formatoPesos(montos[i])} (${detalle})`;
     }),
-    '',
-    `📊 Esfuerzo parejo: todos destinan el ${esfuerzo.toFixed(1)}% de lo que ganan.`,
+    // El % de esfuerzo permite despejar el ingreso (aporte ÷ esfuerzo), así que
+    // solo se incluye cuando se autoriza compartir los ingresos.
+    ...(incluirIngresos ? ['', `📊 Esfuerzo parejo: todos destinan el ${esfuerzo.toFixed(1)}% de lo que ganan.`] : []),
   ].join('\n');
 }
 

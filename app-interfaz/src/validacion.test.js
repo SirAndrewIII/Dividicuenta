@@ -9,34 +9,61 @@ import {
   errorDeMonto,
   esCantidadValida,
   esMontoValido,
+  aMonto,
+  montoOCero,
   sanearComensales,
   sanearCompartidos,
   sanearPropina,
 } from './validacion';
 
-describe('errorDeMonto', () => {
+describe('errorDeMonto (gramática única de importes)', () => {
   it('vacío no es error (todavía no se escribió nada)', () => {
-    expect(errorDeMonto('', 'El precio')).toBeNull();
-    expect(errorDeMonto(null, 'El precio')).toBeNull();
-    expect(errorDeMonto(undefined, 'El precio')).toBeNull();
+    ['', '   ', null, undefined].forEach((v) => expect(errorDeMonto(v, 'El precio')).toBeNull());
   });
 
-  it('acepta de 0 al máximo', () => {
-    expect(errorDeMonto('0', 'El precio')).toBeNull();
-    expect(errorDeMonto('8500.5', 'El precio')).toBeNull();
-    expect(errorDeMonto(MAX_MONTO, 'El precio')).toBeNull();
-  });
+  it.each(['0', '8500', '8500.5', '8500,5', '8500,50', '1.500', '10.000', '$ 4.500', '1.234.567,89', 8500, 8500.55, 0, MAX_MONTO, '1000000000'])(
+    '%j es válido',
+    (valor) => {
+      expect(errorDeMonto(valor, 'El precio')).toBeNull();
+    },
+  );
 
   it.each([
     ['-1', 'El precio no puede ser negativo.'],
-    ['-0.01', 'El precio no puede ser negativo.'],
-    [String(MAX_MONTO + 1), 'El precio es demasiado alto.'],
-    ['1e999', 'El precio no es un número válido.'],
-    ['abc', 'El precio no es un número válido.'],
+    ['-0,01', 'El precio no puede ser negativo.'],
+    [-5, 'El precio no puede ser negativo.'],
+    ['1000000001', 'El precio es demasiado alto.'],
+    [MAX_MONTO + 1, 'El precio es demasiado alto.'],
+    [10.005, 'El precio admite hasta 2 decimales.'],
     [Infinity, 'El precio no es un número válido.'],
     [NaN, 'El precio no es un número válido.'],
-  ])('rechaza %s', (valor, mensaje) => {
+  ])('%j -> %s', (valor, mensaje) => {
     expect(errorDeMonto(valor, 'El precio')).toBe(mensaje);
+  });
+
+  it.each(['abc', '1e999', '12.34.56', '1..2', '1,2,3', '1,500', '1.5.000', '10,555', '1.50.0', ',5', '.5'])(
+    '«%s» es ambiguo o inválido y el mensaje enseña el formato',
+    (valor) => {
+      const mensaje = errorDeMonto(valor, 'El precio');
+      expect(mensaje).toContain('El precio no es válido.');
+      expect(mensaje).toContain('1500, 1.500 o 1500,50');
+    },
+  );
+});
+
+describe('aMonto y montoOCero', () => {
+  it('el texto se interpreta con la misma gramática en todos los campos', () => {
+    expect(aMonto('1.500')).toBe(1500);
+    expect(aMonto('1,5')).toBe(1.5);
+    expect(aMonto('4500,50')).toBe(4500.5);
+    expect(aMonto(8500)).toBe(8500);
+    ['', '  ', null, undefined, 'abc', {}, []].forEach((v) => expect(aMonto(v)).toBeNaN());
+  });
+
+  it('montoOCero convierte lo inválido en 0 para poder sumar', () => {
+    expect(montoOCero('1.500')).toBe(1500);
+    expect(montoOCero('abc')).toBe(0);
+    expect(montoOCero('')).toBe(0);
   });
 });
 
@@ -90,10 +117,10 @@ describe('los cálculos no se contagian de valores no finitos', () => {
   });
 });
 
-describe('saneado de lo guardado en el navegador', () => {
-  it('comensales: corrige cantidades y precios inválidos y descarta lo que no sirve', () => {
+describe('saneado de lo guardado: solo la estructura, nunca los importes', () => {
+  it('comensales: conserva los valores fuera de rango para que se muestren y se marquen (P1)', () => {
     const limpio = sanearComensales([
-      { id: 1, nombre: 'x'.repeat(100), items: [{ id: 2, nombre: 'Plato', cantidad: -3, valorUnitario: 'abc' }, { id: 3, nombre: 'Otro', cantidad: 2.5, valorUnitario: -10 }, { nombre: 'sin id' }, null] },
+      { id: 1, nombre: 'x'.repeat(100), items: [{ id: 2, nombre: 'Plato', cantidad: 150, valorUnitario: 2000000000 }, { id: 3, nombre: 'Otro', cantidad: -3, valorUnitario: '12.34.56' }, { id: 5, nombre: 'Medio', cantidad: 2.5, valorUnitario: 'abc' }, { nombre: 'sin id' }, null] },
       { nombre: 'sin id' },
       { id: 4, nombre: 'Sin items' },
       null,
@@ -101,10 +128,16 @@ describe('saneado de lo guardado en el navegador', () => {
     expect(limpio).toHaveLength(2);
     expect(limpio[0].nombre).toHaveLength(MAX_NOMBRE);
     expect(limpio[0].items).toEqual([
-      { id: 2, nombre: 'Plato', cantidad: 1, valorUnitario: 0 },
-      { id: 3, nombre: 'Otro', cantidad: 1, valorUnitario: 0 },
+      { id: 2, nombre: 'Plato', cantidad: 150, valorUnitario: 2000000000 },
+      { id: 3, nombre: 'Otro', cantidad: -3, valorUnitario: '12.34.56' },
+      { id: 5, nombre: 'Medio', cantidad: 2.5, valorUnitario: 'abc' },
     ]);
     expect(limpio[1]).toEqual({ id: 4, nombre: 'Sin items', items: [] });
+  });
+
+  it('lo que no se puede mostrar (nulo, objetos) vuelve al valor por defecto', () => {
+    const [c] = sanearComensales([{ id: 1, nombre: 'A', items: [{ id: 2, nombre: 'P', cantidad: null, valorUnitario: {} }] }]);
+    expect(c.items[0]).toMatchObject({ cantidad: 1, valorUnitario: 0 });
   });
 
   it('lo que no es una lista queda vacío', () => {
@@ -114,18 +147,22 @@ describe('saneado de lo guardado en el navegador', () => {
     });
   });
 
-  it('compartidos: corrige el valor y los participantes', () => {
+  it('compartidos: conserva el valor y limpia solo los participantes', () => {
     expect(sanearCompartidos([{ id: 1, nombre: 'Vino', valorTotal: -5, comensalesIds: [1, 'x', null, 2] }])).toEqual([
-      { id: 1, nombre: 'Vino', valorTotal: 0, comensalesIds: [1, 2] },
+      { id: 1, nombre: 'Vino', valorTotal: -5, comensalesIds: [1, 2] },
     ]);
+    expect(sanearCompartidos([{ id: 1, nombre: 'Vino', valorTotal: '1.500', comensalesIds: [] }])[0].valorTotal).toBe('1.500');
+    expect(sanearCompartidos([{ id: 1, nombre: 'Vino', valorTotal: null, comensalesIds: [] }])[0].valorTotal).toBe(0);
   });
 
-  it('propina: 0 a 100, vacío se respeta y lo demás vuelve al valor por defecto', () => {
+  it('propina: se conserva aunque esté fuera de 0 a 100; solo lo que no es un número vuelve al valor por defecto', () => {
     expect(sanearPropina(15)).toBe(15);
-    expect(sanearPropina('7.5')).toBe(7.5);
+    expect(sanearPropina('7.5')).toBe('7.5');
     expect(sanearPropina('')).toBe('');
-    [500, -1, 'abc', null, NaN].forEach((v) => expect(sanearPropina(v)).toBe(10));
-    expect(sanearPropina(500, 0)).toBe(0);
+    expect(sanearPropina(500)).toBe(500);
+    expect(sanearPropina(-1)).toBe(-1);
+    [null, undefined, 'abc', NaN, {}].forEach((v) => expect(sanearPropina(v)).toBe(10));
+    expect(sanearPropina('abc', 0)).toBe(0);
   });
 
   it('personas: vuelve a la lista inicial si lo guardado no sirve', () => {

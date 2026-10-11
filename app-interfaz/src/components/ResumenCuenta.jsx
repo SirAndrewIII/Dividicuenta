@@ -39,9 +39,9 @@ export default function ResumenCuenta({
       ) : (
         <>
           {sinAsignar > 0 && (
-            <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <p id="aviso-sin-asignar" role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
               Hay {formatoPesos(sinAsignar)} de platos compartidos sin participantes: no se le cobran a nadie.
-              Elimínalos y regístralos de nuevo eligiendo quién los comparte.
+              Elimínalos y regístralos de nuevo eligiendo quién los comparte. Mientras tanto no se puede compartir la cuenta.
             </p>
           )}
 
@@ -61,13 +61,35 @@ export default function ResumenCuenta({
               ))}
             </ul>
 
-            <div className="flex justify-between items-center pt-2 font-bold text-base text-gray-900">
-              <span>Gran total factura:</span>
-              <span className="text-emerald-700">{formatoPesos(granTotal)}</span>
-            </div>
+            {sinAsignar > 0 ? (
+              <div className="space-y-1 pt-2 text-base text-gray-900">
+                <div className="flex justify-between items-center text-sm font-medium">
+                  <span>Total repartido entre los comensales:</span>
+                  <span>{formatoPesos(granTotal)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm font-medium text-amber-900">
+                  <span>Sin asignar:</span>
+                  <span>{formatoPesos(sinAsignar)}</span>
+                </div>
+                <div className="flex justify-between items-center font-bold">
+                  <span>Total de la factura:</span>
+                  <span className="text-emerald-700">{formatoPesos(granTotal + sinAsignar)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center pt-2 font-bold text-base text-gray-900">
+                <span>Gran total factura:</span>
+                <span className="text-emerald-700">{formatoPesos(granTotal)}</span>
+              </div>
+            )}
           </section>
 
-          <button onClick={onCompartir} className={`${boton} w-full py-3 shadow-md`}>
+          <button
+            onClick={onCompartir}
+            disabled={sinAsignar > 0}
+            aria-describedby={sinAsignar > 0 ? 'aviso-sin-asignar' : undefined}
+            className={`${boton} w-full py-3 shadow-md`}
+          >
             Enviar por WhatsApp
           </button>
         </>

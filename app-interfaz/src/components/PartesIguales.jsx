@@ -4,7 +4,8 @@ import { campo } from '../estilos';
 import { useEstadoPersistente } from '../hooks/useEstadoPersistente';
 import { abrirWhatsApp, mensajeIguales } from '../mensajes';
 import { num, personasIniciales, sanearPersonas } from '../personas';
-import { MAX_MONTO, MAX_TEXTO, errorDeMonto, errorDePropina, sanearPropina } from '../validacion';
+import { MAX_TEXTO, errorDeMonto, errorDePropina, sanearPropina } from '../validacion';
+import CampoMonto from './CampoMonto';
 import { Aviso, Campo, Fila, ListaPersonas, Resultado } from './comunes';
 
 export default function PartesIguales() {
@@ -16,7 +17,7 @@ export default function PartesIguales() {
   const errorTotal = errorDeMonto(total, 'El total');
   const errorPropina = errorDePropina(propina);
   const error = errorTotal || errorPropina;
-  const totalConPropina = num(total) * (1 + num(propina) / 100);
+  const totalConPropina = num(total) * (1 + (Number(propina) || 0) / 100);
   const montos = dividirIgual(totalConPropina, personas.length);
   const listo = num(total) > 0 && !error;
 
@@ -30,7 +31,7 @@ export default function PartesIguales() {
           <input className={`${campo} w-full`} maxLength={MAX_TEXTO} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Asado del sábado" />
         </Campo>
         <Campo etiqueta="Total de la cuenta">
-          <input type="number" min="0" max={MAX_MONTO} aria-invalid={errorTotal !== null} className={`${campo} w-full`} value={total} onChange={(e) => setTotal(e.target.value)} />
+          <CampoMonto aria-invalid={errorTotal !== null} className={`${campo} w-full`} value={total} onChange={(e) => setTotal(e.target.value)} />
         </Campo>
         <Campo etiqueta="Propina (%)">
           <input type="number" min="0" max="100" aria-invalid={errorPropina !== null} className={`${campo} w-full`} value={propina} onChange={(e) => setPropina(e.target.value)} />
@@ -41,7 +42,7 @@ export default function PartesIguales() {
       {listo && (
         <Resultado
           onCompartir={() =>
-            abrirWhatsApp(mensajeIguales({ motivo, total: totalConPropina, propina: num(propina), personas, montos }))
+            abrirWhatsApp(mensajeIguales({ motivo, total: totalConPropina, propina: Number(propina) || 0, personas, montos }))
           }
         >
           {personas.map((p, i) => (

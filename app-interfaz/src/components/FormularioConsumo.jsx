@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { parsearConsumos, formatoPesos } from '../calculos';
 import { boton, campo } from '../estilos';
-import { MAX_CANTIDAD, MAX_LOTE, MAX_MONTO, MAX_TEXTO, errorDeMonto } from '../validacion';
+import { MAX_CANTIDAD, MAX_LOTE, MAX_TEXTO, aMonto, errorDeMonto } from '../validacion';
+import CampoMonto from './CampoMonto';
 
 const MODOS_CARGA = [
   [false, 'Un plato'],
@@ -31,7 +32,7 @@ export default function FormularioConsumo({
         : errorDeMonto(precio, 'El precio');
     if (problema) return setError(problema);
 
-    if (onAgregarItems([{ nombre: nombre.trim(), cantidad: 1, valorUnitario: Number(precio) }])) {
+    if (onAgregarItems([{ nombre: nombre.trim(), cantidad: 1, valorUnitario: aMonto(precio) }])) {
       onNombre('');
       onPrecio('');
       setError(null);
@@ -96,10 +97,7 @@ export default function FormularioConsumo({
             onChange={cambiar(onNombre)}
             className={campo}
           />
-          <input
-            type="number"
-            min="0"
-            max={MAX_MONTO}
+          <CampoMonto
             aria-label="Precio del plato"
             aria-invalid={error !== null && error.includes('precio')}
             aria-describedby={error ? 'error-consumo' : undefined}

@@ -27,14 +27,14 @@ export default function EscanerCarta({ menu, onMenu, onSeleccionarPlato }) {
     <section aria-labelledby="titulo-escaner" className="p-6 border-b border-gray-100 bg-emerald-50/50">
       <h2 id="titulo-escaner" className="text-lg font-semibold text-emerald-800 mb-2">Escanear menú con IA</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Sube una foto de la carta del restaurante para extraer los platos por categorías automáticamente.
+        Sube una foto de la carta del restaurante (JPG, PNG, WEBP o HEIC) para extraer los platos por categorías automáticamente.
       </p>
 
       <div className="flex items-center gap-4">
         <label className="cursor-pointer bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 min-h-11 rounded-xl transition shadow-sm inline-flex items-center gap-2 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-emerald-700">
           <span aria-hidden="true">📄</span>
           <span>Subir foto de la carta</span>
-          <input type="file" accept="image/*" onChange={manejarSubida} className="sr-only" />
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={manejarSubida} className="sr-only" />
         </label>
         {cargando && (
           <span role="status" className="text-sm text-emerald-700 font-medium animate-pulse">

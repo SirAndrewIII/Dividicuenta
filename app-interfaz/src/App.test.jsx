@@ -28,7 +28,7 @@ describe('modo Por consumo', () => {
     await agregarComensales(user, ['Ana', 'Beto', 'Caro']);
 
     await user.type(screen.getByRole('textbox', { name: 'Nombre del plato compartido' }), 'Picada');
-    await user.type(screen.getByRole('spinbutton', { name: 'Valor total del plato compartido' }), '100');
+    await user.type(screen.getByRole('textbox', { name: 'Valor total del plato compartido' }), '100');
     for (const nombre of ['Ana', 'Beto', 'Caro']) await user.click(screen.getByRole('checkbox', { name: nombre }));
     await user.click(screen.getByRole('button', { name: 'Registrar compartido' }));
 
@@ -42,7 +42,7 @@ describe('modo Por consumo', () => {
     const { user } = preparar();
     await agregarComensales(user, ['Ana']);
     await user.type(screen.getByRole('textbox', { name: 'Nombre del plato' }), 'Milanesa');
-    await user.type(screen.getByRole('spinbutton', { name: 'Precio del plato' }), '10000');
+    await user.type(screen.getByRole('textbox', { name: 'Precio del plato' }), '10000');
     await user.click(screen.getByRole('button', { name: 'Añadir plato' }));
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
 
@@ -76,7 +76,7 @@ describe('modo Por consumo', () => {
 
     await user.click(await screen.findByRole('button', { name: /Usar Milanesa/ }));
     expect(screen.getByRole('textbox', { name: 'Nombre del plato' }).value).toBe('Milanesa');
-    expect(screen.getByRole('spinbutton', { name: 'Precio del plato' }).value).toBe('8500');
+    expect(screen.getByRole('textbox', { name: 'Precio del plato' }).value).toBe('8500');
   });
 
   it('muestra en la página los errores del escaneo (sin alert)', async () => {
@@ -136,13 +136,13 @@ describe('pestañas', () => {
   it('los datos de cada modo se conservan al cambiar de pestaña (FE-1)', async () => {
     const { user } = preparar();
     await user.click(screen.getByRole('tab', { name: /Partes iguales/ }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Total de la cuenta' }), '90000');
+    await user.type(screen.getByRole('textbox', { name: 'Total de la cuenta' }), '90000');
     await user.click(screen.getByRole('button', { name: '+ Sumar otra persona' }));
 
     await user.click(screen.getByRole('tab', { name: /Según ingresos/ }));
     await user.click(screen.getByRole('tab', { name: /Partes iguales/ }));
 
-    expect(screen.getByRole('spinbutton', { name: 'Total de la cuenta' }).value).toBe('90000');
+    expect(screen.getByRole('textbox', { name: 'Total de la cuenta' }).value).toBe('90000');
     expect(screen.getAllByText('$30.000').length).toBeGreaterThanOrEqual(3);
   });
 
@@ -177,9 +177,9 @@ describe('pestañas', () => {
   it('Según ingresos reparte proporcionalmente', async () => {
     const { user } = preparar();
     await user.click(screen.getByRole('tab', { name: /Según ingresos/ }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Gasto total' }), '300000');
-    await user.type(screen.getByRole('spinbutton', { name: 'Ingreso de Persona 1' }), '1000000');
-    await user.type(screen.getByRole('spinbutton', { name: 'Ingreso de Persona 2' }), '500000');
+    await user.type(screen.getByRole('textbox', { name: 'Gasto total' }), '300000');
+    await user.type(screen.getByRole('textbox', { name: 'Ingreso de Persona 1' }), '1000000');
+    await user.type(screen.getByRole('textbox', { name: 'Ingreso de Persona 2' }), '500000');
     expect(screen.getByText('$200.000')).toBeTruthy();
     expect(screen.getByText('$100.000')).toBeTruthy();
   });
@@ -187,8 +187,8 @@ describe('pestañas', () => {
   it('Quién pagó qué muestra las transferencias', async () => {
     const { user } = preparar();
     await user.click(screen.getByRole('tab', { name: /Quién pagó qué/ }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Pagó de Persona 1' }), '9000');
-    await user.type(screen.getByRole('spinbutton', { name: 'Pagó de Persona 2' }), '3000');
+    await user.type(screen.getByRole('textbox', { name: 'Pagó de Persona 1' }), '9000');
+    await user.type(screen.getByRole('textbox', { name: 'Pagó de Persona 2' }), '3000');
     expect(screen.getByText('Persona 2 → Persona 1')).toBeTruthy();
     expect(screen.getByText('$3.000')).toBeTruthy();
   });
@@ -206,10 +206,10 @@ describe('accesibilidad (axe)', () => {
     const { user, container } = preparar();
     await agregarComensales(user, ['Ana', 'Beto']);
     await user.type(screen.getByRole('textbox', { name: 'Nombre del plato' }), 'Milanesa');
-    await user.type(screen.getByRole('spinbutton', { name: 'Precio del plato' }), '8500');
+    await user.type(screen.getByRole('textbox', { name: 'Precio del plato' }), '8500');
     await user.click(screen.getByRole('button', { name: 'Añadir plato' }));
     await user.type(screen.getByRole('textbox', { name: 'Nombre del plato compartido' }), 'Vino');
-    await user.type(screen.getByRole('spinbutton', { name: 'Valor total del plato compartido' }), '5000');
+    await user.type(screen.getByRole('textbox', { name: 'Valor total del plato compartido' }), '5000');
     await user.click(screen.getByRole('checkbox', { name: 'Ana' }));
     await user.click(screen.getByRole('button', { name: 'Registrar compartido' }));
     await user.upload(screen.getByLabelText(/Subir foto de la carta/), archivoCarta());
@@ -227,9 +227,9 @@ describe('accesibilidad (axe)', () => {
   ])('%s, con resultado, no tiene violaciones', async (_nombre, tab) => {
     const { user, container } = preparar();
     await user.click(screen.getByRole('tab', { name: tab }));
-    const total = screen.queryByRole('spinbutton', { name: /Total de la cuenta|Gasto total/ });
+    const total = screen.queryByRole('textbox', { name: /Total de la cuenta|Gasto total/ });
     if (total) await user.type(total, '1000');
-    for (const campo of screen.queryAllByRole('spinbutton', { name: /^(Ingreso|Pagó) de/ })) await user.type(campo, '500');
+    for (const campo of screen.queryAllByRole('textbox', { name: /^(Ingreso|Pagó) de/ })) await user.type(campo, '500');
 
     expect(await auditar(container)).toEqual([]);
   });
