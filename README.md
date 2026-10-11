@@ -79,8 +79,14 @@ Variables de entorno del **backend** (ver [.env.example](.env.example)):
 - `GEMINI_API_KEY`: obligatoria.
 - `GEMINI_MODEL` (por defecto `gemini-3.8-flash`): Google retira modelos con el tiempo. Si el escaneo responde 502 y el log de Render muestra `404 NOT_FOUND ... is no longer available`, basta con cambiar esta variable y reiniciar el servicio, sin tocar código. `python test_gemini.py` prueba la clave y los modelos.
 - `ALLOWED_ORIGINS`: dominio(s) del frontend separados por coma. **Sin esto, el escaneo de cartas falla por CORS** al estar el frontend en otro dominio.
-- `TRUST_PROXY=1`: si el backend está detrás de un proxy (Render, Railway...), para que el límite de peticiones use la IP real. Se toma la entrada de `X-Forwarded-For` que **agrega el proxy** (la última), nunca la primera, que puede escribirla el cliente.
-- `TRUSTED_PROXY_HOPS` (1): cuántos proxies de confianza hay delante. Usa 2 si además hay un CDN delante.
+- `TRUST_PROXY=1`: si el backend está detrás de un proxy, para que el límite de peticiones use la IP real. **Es necesario en Render:** sin esto uvicorn toma la *primera* entrada de `X-Forwarded-For`, que escribe el cliente, y un encabezado falso esquiva el límite por IP.
+- `TRUSTED_PROXY_HOPS` (por defecto 1): cuántas entradas agrega la infraestructura delante del backend; la IP del cliente es la que está a esa distancia desde el final de `X-Forwarded-For`. **En Render hay que usar `3`** (se midió en producción: con 1 y con 2 el límite no cortaba ni a un cliente normal, y con 3 corta exactamente a la décima petición, incluso con un encabezado falso). Si Render cambia su infraestructura o migras de proveedor, vuelve a medirlo:
+  ```bash
+  # 13 peticiones inocuas (un archivo de texto se rechaza con 400 antes de llegar a Gemini).
+  # Esperado: diez 400 y luego 429. Repite con un X-Forwarded-For falso distinto en cada una:
+  # el resultado debe ser el mismo. Espera un minuto entre pruebas.
+  for i in $(seq 1 13); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://TU-BACKEND/api/parse-menu -F 'file=@nota.txt;type=text/plain'; done
+  ```
 - `MAX_UPLOAD_MB` (5), `RATE_LIMIT_MAX` (10 por minuto y por IP) y `GLOBAL_RATE_LIMIT_MAX` (100 por minuto en total): opcionales.
 
 Variable del **frontend** (se fija al compilar): `VITE_API_URL`, la URL pública del backend.
